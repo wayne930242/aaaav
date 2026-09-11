@@ -6,7 +6,7 @@ description: Use when project terminology or domain boundaries need refinement.
 # Domain Modeling
 
 Actively reconcile the user's language, the project's glossary, and code. Direct
-source-changing requests enter `leveraging-tasks`; return confirmed terms and
+source-changing requests enter `aaaav-do`; return confirmed terms and
 decisions to its Advance phase.
 
 ## Discipline
@@ -34,8 +34,8 @@ decisions to its Advance phase.
 - Translate external schemas, persistence records, and another context's
   vocabulary at explicit adapter seams; do not let them become the internal
   domain model by accident.
-- Use tactical DDD patterns only when they clarify real domain rules. Do not
-  manufacture entities, aggregates, value objects, or repositories as ceremony.
+- Use tactical DDD patterns only when they clarify real domain rules. Reserve
+  entities, aggregates, value objects, and repositories for genuine domain concepts.
 - Return to Advance when implementation reveals a domain
   contradiction. Do not encode an unconfirmed model silently.
 

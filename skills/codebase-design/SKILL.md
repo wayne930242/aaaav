@@ -5,7 +5,7 @@ description: Use when designing or changing module interfaces and seams.
 
 # Codebase Design
 
-Supply design discipline within `leveraging-tasks`. Direct source-changing
+Supply design discipline within `aaaav-do`. Direct source-changing
 requests enter that lifecycle first; return decisions to its `design.md`.
 
 ## Vocabulary

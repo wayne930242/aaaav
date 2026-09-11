@@ -18,7 +18,7 @@ Two entries:
   accepted a feedback pass. Name the real interface and the flows to operate,
   then collect what the person observed.
 
-Route a crash or reproducible failure to `leveraging-tasks` debugging and a
+Route a crash or reproducible failure to `aaaav-do` debugging and a
 request for new behavior to its implementation path. A reaction with no
 identifiable target may be venting; ask whether the user wants it investigated.
 
@@ -72,11 +72,11 @@ input.
 
 ## 4. Hand off
 
-Return the confirmed chain to `leveraging-tasks` as decision input for the
+Return the confirmed chain to `aaaav-do` as decision input for the
 source-changing fix. It classifies artifact depth itself: a localized correction
 runs inline there, and only durable decisions produce artifacts. Handing the
 chain over is what keeps it from being re-derived, not a checkpoint the fix has
 to clear.
 
-**Complete when:** no change was requested, or `leveraging-tasks` has received a
+**Complete when:** no change was requested, or `aaaav-do` has received a
 confirmed correction target.
