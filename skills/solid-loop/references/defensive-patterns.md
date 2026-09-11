@@ -1,6 +1,10 @@
 # Defensive Patterns vs. Expected Behavior
 
-Replace defensive prohibitions and endless red lines with concise, positive statements of expected behavior.
+Replace defensive prohibitions, endless red lines, and negative framing with concise, positive statements of expected behavior.
+
+## The Negation Anti-Pattern
+
+Negative steering ("do not think of an elephant") brings the forbidden concept into context, increasing the likelihood that the model acts on it. State the positive target behavior directly so the prohibited pattern is never primed.
 
 ## Pattern Comparison
 
@@ -14,4 +18,4 @@ Replace defensive prohibitions and endless red lines with concise, positive stat
 
 ## Key Principle
 
-Prompts and agent instructions must directly state the expected outcome and operational boundaries. Strong models execute effectively when given clear intent, reality anchors, and contracts.
+Prompts and agent instructions must directly state expected outcomes and operational boundaries. Strong models execute effectively when given clear intent, reality anchors, and observable completion criteria.

@@ -10,17 +10,20 @@ description: Use when <trigger conditions and intended outcome>.
 
 # <Skill Name>
 
-<Single-paragraph overview stating the objective and operational context.>
+<Single-paragraph overview stating the root virtue, objective, and operational context.>
 
 ## Workflow
 
-1. **<Step 1>**: <Direct statement of action and expected outcome.>
-2. **<Step 2>**: <Direct statement of action and expected outcome.>
-3. **<Step 3>**: <Direct statement of action and expected outcome.>
+1. **<Step 1 Name>**: <Direct statement of action and expected behavior.>
+   - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
+2. **<Step 2 Name>**: <Direct statement of action and expected behavior.>
+   - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
+3. **<Step 3 Name>**: <Direct statement of action and expected behavior.>
+   - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
 
 ## Verification
 
-Exercise the reality anchor and report results in the standard format:
+Exercise the reality anchor and report results in standard format:
 
 | Requirement | Evidence | Result |
 |---|---|---|
@@ -28,6 +31,6 @@ Exercise the reality anchor and report results in the standard format:
 
 ## References
 
-Link detailed schemas, templates, or operational steps:
+Disclosed secondary references and situational branches:
 - [Reference Name](references/<reference-file>.md)
 ```
