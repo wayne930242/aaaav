@@ -5,7 +5,7 @@ description: Use when executing scoped, ambiguous, or multi-step source-changing
 
 # AAAAV Development Loop
 
-Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align -> Advance -> Anchor -> Act -> Verify** (also referenced as ADAAV: Align -> Advance -> Anchor -> Act -> Verify). Advance carries Decision -> Spec -> Design for durable Mini SDD work. Return when user intent or observable behavior changes.
+Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify** (also referenced as ADAAV: Align → Advance → Anchor → Act → Verify). Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
 
 ## Align
 
@@ -22,7 +22,7 @@ Escalate to durable when the request carries material ambiguity, spans modules o
 
 Inline work follows Alignment with these two lines. They are required output:
 
-    Inline -- Contract: <one sentence of the observable behavior after the change>
+    Inline — Contract: <one sentence of the observable behavior after the change>
     Authorization: <the user's explicit source-change request>
 
 Approval already given is not requested again. Durable work reads [MINI-SDD.md](MINI-SDD.md) and creates or resumes its folder before it specifies anything; that folder is its declaration.
