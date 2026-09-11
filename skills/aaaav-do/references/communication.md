@@ -9,7 +9,7 @@ Standardize agent-user communication across all skills and interactions.
 3. **Direct and Concise**: State facts and findings plainly. Omit conversational filler, apologies, and sycophantic phrasing.
 4. **State Expected Behavior Directly**: Describe what the system should do. Avoid defensive warnings, prohibitive lists, or speculative guardrails.
 5. **Language Separation**:
-   - User communication: Traditional Chinese (繁體中文).
+   - User communication: Traditional Chinese.
    - Code, tests, prompts, and internal skill instructions: English.
 
 ## Handling Ambiguity

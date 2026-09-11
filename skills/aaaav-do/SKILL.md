@@ -3,9 +3,9 @@ name: aaaav-do
 description: Use when executing source-changing development through AAAAV (Align → Advance → Anchor → Act → Verify); keep low-reuse local work inline and persist only durable decisions.
 ---
 
-# Leveraging Tasks
+# AAAAV Development Loop
 
-Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify** (ADAAV: Align → Advance → Anchor → Act → Verify; 對齊 → 推進 → 定錨 → 實作 → 驗證). Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
+Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify** (also referenced as ADAAV: Align → Advance → Anchor → Act → Verify). Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
 
 ## Align
 

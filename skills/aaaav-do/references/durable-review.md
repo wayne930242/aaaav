@@ -25,7 +25,7 @@ Before editing code for durable tasks, verify prerequisite foundations:
 When a task introduces new rules or new skills, review them during the Verify phase:
 
 1. **Evaluate Purpose**: Confirm that the new rule or skill serves a durable, recurring pattern rather than an isolated edge case.
-2. **Review for Adjustment (調整)**: Focus the review on tuning clarity, calibration, and trigger conditions:
+2. **Review for Adjustment**: Focus the review on tuning clarity, calibration, and trigger conditions:
    - Is the trigger condition ("Use when...") distinct and unambiguous?
    - Are expected behaviors stated directly and positively?
    - Can instructions be compacted further?
