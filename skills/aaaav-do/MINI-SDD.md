@@ -10,8 +10,8 @@ research, tickets, and visuals rather than copying them.
 ## `decision.md`
 
 Outcome and actors; in and out of scope; concrete scenarios; confirmed
-decisions; open consequential decisions. Before implementation, confirm prerequisite
-skills and core rules readiness. Explore every consequential branch in:
+decisions; open consequential decisions. Confirm prerequisite skills and core
+rules readiness. Explore every consequential branch in:
 
 ```
 | Question | Answer | Basis | Status |
@@ -50,10 +50,8 @@ short, but it still names precedent and seam.
 One `Requirement | Evidence | Result` row per requirement in `spec.md`, where
 `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts;
 deviations from the confirmed spec or design; unresolved gaps and their impact.
-Conduct reviews of newly introduced rules and skills focused on tuning and adjustment,
-avoiding defensive red lines.
-Keep local verification, commit, push, CI, deployment, and browser proof as
-separate claims.
+Review newly added rules and skills for tuning. Keep local verification, commit,
+push, CI, deployment, and browser proof as separate claims.
 
 ## Updates
 
