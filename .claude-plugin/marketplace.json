@@ -1,0 +1,14 @@
+{
+  "name": "weihung-loop-boot",
+  "metadata": {
+    "version": "0.1.0",
+    "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
+  },
+  "plugins": [
+    {
+      "name": "weihung-loop-boot",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Validate skill and rule files against AAAAV compactness and standardization principles",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/validate_tool_use.py\" || echo '{}'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

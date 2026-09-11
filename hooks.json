@@ -1,0 +1,16 @@
+{
+  "aaaav-validator": {
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./hooks/validate_tool_use.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
