@@ -1,5 +1,5 @@
 [project]
-name = "weihung-loop-boot"
+name = "aaaav-loop-boot"
 version = "0.1.0"
 description = "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
 readme = "README.md"

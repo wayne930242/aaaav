@@ -83,7 +83,7 @@ def main() -> None:
                 rel = target_path
 
             lines = "\n".join(f"  - {w}" for w in warnings)
-            msg = f"⚠ [weihung-loop-boot] Validation suggestions for {rel}:\n{lines}"
+            msg = f"⚠ [aaaav-loop-boot] Validation suggestions for {rel}:\n{lines}"
 
             if is_claude:
                 output = {
@@ -102,7 +102,7 @@ def main() -> None:
             print(json.dumps({}))
 
     except Exception as e:
-        sys.stderr.write(f"weihung-loop-boot hook error: {e}\n")
+        sys.stderr.write(f"aaaav-loop-boot hook error: {e}\n")
         print(json.dumps({}))
 
     sys.exit(0)

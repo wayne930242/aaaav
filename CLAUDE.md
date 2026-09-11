@@ -1,4 +1,4 @@
-# Claude Code Project Guidelines: weihung-loop-boot
+# Claude Code Project Guidelines: aaaav-loop-boot
 
 This project is a multi-platform plugin supporting Antigravity, Claude Code, and Codex.
 

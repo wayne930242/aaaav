@@ -1,4 +1,4 @@
-# Agent Working Agreements: weihung-loop-boot
+# Agent Working Agreements: aaaav-loop-boot
 
 This repository defines a streamlined, multi-platform AAAAV plugin for Antigravity, Claude Code, and Codex.
 

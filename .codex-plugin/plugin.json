@@ -1,5 +1,5 @@
 {
-  "name": "weihung-loop-boot",
+  "name": "aaaav-loop-boot",
   "version": "0.1.0",
   "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, and durable reviews without defensive bloat.",
   "author": {
@@ -15,7 +15,7 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "weihung-loop-boot",
+    "displayName": "aaaav-loop-boot",
     "shortDescription": "Streamlined AAAAV agent workflow plugin",
     "longDescription": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, and durable reviews without defensive bloat.",
     "developerName": "Wei Hung",
