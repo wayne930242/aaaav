@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: Use when resolving user-owned decisions or ambiguous tradeoffs through an interactive design-tree interview.
+description: Use when resolving user-owned decisions or ambiguous architectural tradeoffs.
 ---
 
 Interview the user relentlessly until you reach a shared understanding. Map the subject as a **design tree**: every decision branches into the decisions that depend on it.

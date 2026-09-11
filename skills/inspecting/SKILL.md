@@ -1,6 +1,6 @@
 ---
 name: inspecting
-description: Use when checking, auditing, verifying, or reviewing a defined target, commit, diff, or spec.
+description: Use when auditing or reviewing a specific target, diff, commit, or spec.
 ---
 
 # Inspecting

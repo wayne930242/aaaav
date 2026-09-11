@@ -1,6 +1,6 @@
 ---
 name: investigating
-description: Use when researching a question, diagnosing issues, or gathering traceable evidence.
+description: Use when researching questions, diagnosing root causes, or gathering evidence.
 ---
 
 # Investigating

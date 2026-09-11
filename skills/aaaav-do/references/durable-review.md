@@ -11,7 +11,7 @@ Before editing code for durable tasks, verify prerequisite foundations:
    - Direct statement of expected behaviors without defensive phrasing.
    - Reality anchor defined before production edits.
 2. **Audit Required Skills**: Identify whether the planned work requires specialized capabilities (e.g., domain modeling, API design, security scanning):
-   - If a crucial skill is missing, define and introduce it before commencing production edits.
+   - If a crucial skill is missing, invoke `solid-loop` to bootstrap and scaffold it before commencing production edits.
    - Supply the missing capability upfront so execution operates on established ground.
 
 ## 2. Preventing Infinite Expansion

@@ -1,6 +1,6 @@
 ---
 name: grill-with-docs
-description: Use when durable decision exploration should preserve its questions, answers, domain terms, or ADRs.
+description: Use when exploring durable decisions, domain terms, or ADRs.
 ---
 
 # Grill With Docs

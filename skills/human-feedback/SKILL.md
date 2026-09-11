@@ -1,6 +1,6 @@
 ---
 name: human-feedback
-description: Use when a person reacts to working output — dissatisfaction, a correction, "this feels wrong" — or when verification hands a UI or human-use scenario to a person to operate and report back.
+description: Use when evaluating human feedback or conducting interactive UI verification.
 ---
 
 # Human Feedback

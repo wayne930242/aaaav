@@ -1,11 +1,11 @@
 ---
 name: aaaav-do
-description: Use when executing source-changing development through AAAAV (Align → Advance → Anchor → Act → Verify); keep low-reuse local work inline and persist only durable decisions.
+description: Use when executing scoped, ambiguous, or multi-step source-changing work.
 ---
 
 # AAAAV Development Loop
 
-Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify** (also referenced as ADAAV: Align → Advance → Anchor → Act → Verify). Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
+Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align -> Advance -> Anchor -> Act -> Verify** (also referenced as ADAAV: Align -> Advance -> Anchor -> Act -> Verify). Advance carries Decision -> Spec -> Design for durable Mini SDD work. Return when user intent or observable behavior changes.
 
 ## Align
 
@@ -16,13 +16,13 @@ Open every run with one working interpretation in the model's own words:
 Declare the change **Inline** or **Durable** before the first production edit:
 
 - **Inline:** Requirements are clear, impact is localized, implementation and verification fit this run, and the decisions have little future reuse. Inline work may change observable behavior and writes no artifact files.
-- **Durable:** A decision, constraint, or proof must outlive this run — unconfirmed design, a public or external contract, a migration, cross-component coordination, continuity across a session or handoff, a user-requested spec, or an active related artifact.
+- **Durable:** A decision, constraint, or proof must outlive this run -- unconfirmed design, a public or external contract, a migration, cross-component coordination, continuity across a session or handoff, a user-requested spec, or an active related artifact.
 
 Escalate to durable when the request carries material ambiguity, spans modules or sessions, sets a lasting contract, is high risk, expands scope, or requests a spec first.
 
 Inline work follows Alignment with these two lines. They are required output:
 
-    Inline — Contract: <one sentence of the observable behavior after the change>
+    Inline -- Contract: <one sentence of the observable behavior after the change>
     Authorization: <the user's explicit source-change request>
 
 Approval already given is not requested again. Durable work reads [MINI-SDD.md](MINI-SDD.md) and creates or resumes its folder before it specifies anything; that folder is its declaration.
@@ -33,7 +33,7 @@ Once a task is dispatched, this belongs to the worker and the user; a bounded lo
 
 ### Decision
 
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Create `decision.md` for new work and resume a legacy artifact in place. Check that prerequisite skills and core rules are ready before implementation.
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Create `decision.md` for new work and resume a legacy artifact in place. Check that prerequisite skills and core rules are ready before implementation; invoke `solid-loop` to bootstrap missing project skills.
 
 **Complete when:** no open decision blocks observable behavior.
 

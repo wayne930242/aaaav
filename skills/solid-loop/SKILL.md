@@ -1,6 +1,6 @@
 ---
 name: solid-loop
-description: Use when creating, auditing, or refactoring skills to eliminate defensive bloat, standardize communication and reporting, and maintain high-density concise instructions.
+description: Use when creating, auditing, or refactoring skills.
 ---
 
 # Solid Loop

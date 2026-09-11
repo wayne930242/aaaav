@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: Use when answering an unresolved design or architecture question with disposable throwaway code.
+description: Use when resolving an architectural question or hypothesis with disposable code.
 ---
 
 # Prototype
