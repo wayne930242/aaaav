@@ -33,7 +33,7 @@ Once a task is dispatched, this belongs to the worker and the user; a bounded lo
 
 ### Decision
 
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Create `decision.md` for new work and resume a legacy artifact in place. Check that prerequisite skills and core rules are ready before implementation; invoke `solid-loop` to bootstrap missing project skills.
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Create `decision.md` for new work and resume a legacy artifact in place. Check that core rules are ready before implementation. Open decisions that block observable behavior are settled before proceeding.
 
 **Complete when:** no open decision blocks observable behavior.
 
@@ -61,13 +61,21 @@ The harness-native plan owns sequencing. Follow the target project's native prac
 
 ## Verify
 
+### 1. Evidence Verification
+
 Exercise the chosen reality anchor and capture what it observed. Then review the diff separately against project standards, the approved contract, and the confirmed domain model. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
 
 Give every requirement in the contract its own `Requirement | Evidence | Result` row, where `Result` is `pass`, `fail`, or `unknown` and `Evidence` names the real interface exercised and what it observed. A green suite, a passing unrelated check, or an agent's claim of completion is not evidence for a requirement nothing exercised; that requirement stays `unknown`.
 
-During verification, review newly added rules and skills for adjustment and tuning. Avoid defensive phrasing or prohibitive red lines.
+### 2. Reflexive Pass
 
-**Complete when:** every requirement has credible evidence from its chosen anchor and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
+After functional verification, conduct a scoped reflection limited strictly to the rules, `AGENTS.md` / `CLAUDE.md`, and skills actually used during this run:
+
+1. **Retrospective Question**: Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+2. **Skill ROI Evaluation**: Audit whether each skill used helped save task time and tokens, or whether it caused detours and reading unnecessary files.
+3. **Agent System Calibration**: Invoke `solid-loop` to adjust, scaffold, or prune rules and skills based on the retrospective findings. Avoid defensive phrasing or prohibitive red lines.
+
+**Complete when:** every requirement has credible evidence from its chosen anchor, the reflexive pass has reviewed used system assets, and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
 
 ## Standards and References
 

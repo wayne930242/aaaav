@@ -8,13 +8,15 @@ Modern foundation models are capable pair programmers. They do not require endle
 
 1. **`aaaav-do`** (Development Loop):
    - **Align**: Restate intent in user terms; classify as **Inline** (fast, localized) or **Durable** (architectural, cross-session).
-   - **Advance**: `Decision → Spec → Design` for Durable work. Dispatched tasks belong to the worker and user; self-carried loops run inline.
+   - **Advance**: `Decision → Spec → Design` for Durable work. Focus on contracts, seams, and decisions; no upfront skill scaffolding.
    - **Anchor**: Name the reality anchor and checkpoint before the first production edit.
    - **Act**: Implement surgical changes through native project practices.
-   - **Verify**: Exercise the anchor and report observations in `Requirement | Evidence | Result` tables. Conduct reviews for adjustment and tuning, not defensive restrictions.
-2. **`solid-loop`** (Skill Streamlining & Standardization):
-   - Eliminates defensive bloat and prohibitive red lines.
-   - Standardizes reporting, communication, and documentation across skills.
+   - **Verify**: Exercise the anchor and report observations in `Requirement | Evidence | Result` tables. Run a scoped **Reflexive** pass on rules, `AGENTS.md`/`CLAUDE.md`, and skills used during the run.
+2. **`solid-loop`** (Agent System Reflexive Audit & Solidification):
+   - Invoked during the Verify Reflexive pass to audit skills and instructions used in the task.
+   - Evaluates whether skills saved task time and tokens, or caused detours and reading unnecessary files.
+   - Centers on the retrospective question: *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+   - Tunes, scaffolds, or prunes agent system instructions to solidify predictability without defensive bloat.
    - Keeps skills under 120 lines via progressive disclosure to `references/`.
 
 ## Usage
@@ -47,10 +49,10 @@ Reality anchor: pytest tests/test_email.py
 # Durable Work (Architectural change or new spec)
 Alignment: Implement multi-tenant authentication provider
 # Advances through docs/specs/YYYY-MM-DD-<slug>/:
-# 1. decision.md  (Resolves facts, confirms prerequisite skills & core rules)
-# 2. spec.md      (Status: proposed until approved, names reality anchor)
-# 3. design.md    (Minimal architecture and seams)
-# 4. verification.md (Requirement | Evidence | Result table)
+# 1. decision.md     (Resolves facts, confirms core rules)
+# 2. spec.md         (Status: proposed until approved, names reality anchor)
+# 3. design.md       (Minimal architecture and seams)
+# 4. verification.md (Requirement | Evidence | Result table & Reflexive review)
 ```
 
 ### 3. Validating Workflows & Skills

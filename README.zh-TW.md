@@ -8,13 +8,15 @@
 
 1. **`aaaav-do`**（AAAAV 開發循環）：
    - **Align（對齊）**：用使用者語言重述需求，劃分 **Inline**（局部快速修改）或 **Durable**（持久性架構決策）。
-   - **Advance（推進）**：Durable 任務依循 `Decision → Spec → Design` 推進；指派任務歸屬 Worker 與使用者，自行承接的迴圈以 Inline 執行。
+   - **Advance（推進）**：Durable 任務依循 `Decision → Spec → Design` 推進；專注於合約、接縫與決策收斂，Advance 階段不再預先建立或腳手架 skill。
    - **Anchor（定錨）**：在第一筆生產代碼修改前宣告 Reality Anchor（真實反饋錨點）與 Checkpoint。
    - **Act（實作）**：遵循目標專案原生規範，微小且精準地實作。
-   - **Verify（驗證）**：執行錨點並以 `Requirement | Evidence | Result` 三欄表記錄觀察事實。在驗證階段檢討新規則與技能，目的在於「調校與校準」，而非增設防禦性紅線。
-2. **`solid-loop`**（技能精簡與標準化）：
-   - 消除防禦性贅詞與禁止性條文，直接陳述期望行為。
-   - 標準化所有技能的報告能力（三欄驗證表）、溝通能力（透明推理、主動通報）與文件能力（單次可讀、連結優先）。
+   - **Verify（驗證）**：執行錨點並以 `Requirement | Evidence | Result` 三欄表記錄觀察事實。接著進行 **Reflexive（反思）** 流程，範圍僅限於本次任務中使用到的 rules、`AGENTS.md`/`CLAUDE.md` 與 skills。
+2. **`solid-loop`**（Agent System 反思審計與固化）：
+   - 於 Verify 的 Reflexive 流程中調用，檢討本次任務實際使用到的技能與系統指令。
+   - 核心審計標準：檢討該技能究竟是「幫助我們節省任務時間與 token，還是反而讀取了不必要的檔案和繞遠路？」
+   - 以反思核心提問引導：「如果我早就知道什麼，就會在這次工作中減少摩擦和繞路？」
+   - 依據回顧結果建立、調整或精簡 agent system，消除防禦性贅詞與沉積。
    - 透過 Progressive Disclosure 將細節下放 `references/`，使 Skill 主文保持在 120 行以內。
 
 ## 用法
@@ -47,10 +49,10 @@ Reality anchor: pytest tests/test_email.py
 # Durable 模式（涉及架構或跨會話之變更）
 Alignment: 實作多租戶認證機制
 # 依序推進產出 docs/specs/YYYY-MM-DD-<slug>/:
-# 1. decision.md  (收斂事實，工作前確認核心規則與專門技能準備度)
-# 2. spec.md      (宣告 Reality Anchor，需待使用者核准)
-# 3. design.md    (最小架構設計與介面邊界)
-# 4. verification.md (填寫三欄客觀驗證表，並進行微調導向檢討)
+# 1. decision.md     (收斂事實，確認核心規則準備度)
+# 2. spec.md         (宣告 Reality Anchor，需待使用者核准)
+# 3. design.md       (最小架構設計與介面邊界)
+# 4. verification.md (填寫三欄客觀驗證表與 Reflexive 反思檢討)
 ```
 
 ### 3. 工作流與技能驗證

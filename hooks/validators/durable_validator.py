@@ -15,12 +15,11 @@ def check_decision_md(path: Path) -> list[str]:
     if not re.search(r"\|\s*Question\s*\|\s*Answer\s*\|\s*Basis\s*\|\s*Status\s*\|", text, re.IGNORECASE):
         warnings.append("decision.md should include a Question | Answer | Basis | Status table.")
 
-    # Check for pre-flight prerequisite readiness (skills and core rules)
+    # Check for pre-flight readiness (core rules)
     lower = text.lower()
-    if "prerequisite" not in lower and "skill" not in lower and "rule" not in lower and "readiness" not in lower:
+    if "rule" not in lower and "readiness" not in lower and "prerequisite" not in lower and "core" not in lower:
         warnings.append(
-            "check and supply missing core rules or crucial skills before starting work; "
-            "note skill readiness in decision.md."
+            "confirm core rules readiness before implementation; note readiness in decision.md."
         )
 
     return warnings

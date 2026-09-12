@@ -6,7 +6,7 @@ Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its pha
 
 ## `decision.md`
 
-Outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Confirm prerequisite skills and core rules readiness; invoke `solid-loop` to bootstrap missing project skills. Explore every consequential branch in:
+Outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Confirm core rules readiness before implementation. Explore every consequential branch in:
 
 ```
 | Question | Answer | Basis | Status |
@@ -34,7 +34,7 @@ Chosen approach; interfaces and data flow affected; existing precedent; decision
 
 ## `verification.md`
 
-One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved gaps and their impact. Review newly added rules and skills for tuning. Keep local verification, commit, push, CI, deployment, and browser proof as separate claims.
+One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved gaps and their impact. Include a scoped Reflexive section reviewing used rules, `AGENTS.md` / `CLAUDE.md`, and skills: evaluate whether skills saved time/tokens or caused detours, guided by "What did I wish I knew earlier to reduce friction and detours?", invoking `solid-loop` to calibrate agent system assets. Keep local verification, commit, push, CI, deployment, and browser proof as separate claims.
 
 ## Updates
 

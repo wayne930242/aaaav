@@ -1,32 +1,33 @@
-# Durable Review & Pre-Flight Standards
+# Durable Review & Reflexive Standards
 
-Conduct retrospectives and reviews under the Durable philosophy: avoid infinite expansion of rules and guardrails, ensure readiness before work begins, and focus reviews on tuning rather than defensive restrictions.
+Conduct retrospectives and reviews under the Durable philosophy: avoid infinite expansion of rules and guardrails, ensure core rule readiness before work begins, and focus post-task reflection on reducing friction and detours.
 
 ## 1. Pre-Flight Readiness (Before Work Begins)
 
-Before editing code for durable tasks, verify prerequisite foundations:
+Before editing code for durable tasks, verify core foundations:
 
 1. **Check Core Rules**: Ensure project-level core principles are active and understood:
    - Traditional Chinese for communication, English for prompts/instructions.
    - Direct statement of expected behaviors without defensive phrasing.
    - Reality anchor defined before production edits.
-2. **Audit Required Skills**: Identify whether the planned work requires specialized capabilities (e.g., domain modeling, API design, security scanning):
-   - If a crucial skill is missing, invoke `solid-loop` to bootstrap and scaffold it before commencing production edits.
-   - Supply the missing capability upfront so execution operates on established ground.
+2. **Lean Startup**: Do not scaffold or bootstrap skills up front in Advance. Proceed directly into execution using native project practices and existing capabilities.
 
 ## 2. Preventing Infinite Expansion
 
 - Modern models have strong general capabilities; avoid accumulating reactive micro-rules for every transient failure.
 - When an issue occurs, determine whether it reflects an architectural ambiguity or simply an execution misstep.
-- Resist creating permanent "red lines" or restrictive checklists for transient slips. Maintain a light and stable rule set.
+- Resist creating permanent red lines or restrictive checklists for transient slips. Maintain a light and stable rule set.
 
-## 3. Post-Implementation Review (During Verification)
+## 3. Reflexive Review (During Verification)
 
-When a task introduces new rules or new skills, review them during the Verify phase:
+After exercising the reality anchor, run a scoped Reflexive pass. Limit this review strictly to rules, `AGENTS.md` / `CLAUDE.md`, and skills actually used during the task:
 
-1. **Evaluate Purpose**: Confirm that the new rule or skill serves a durable, recurring pattern rather than an isolated edge case.
-2. **Review for Adjustment**: Focus the review on tuning clarity, calibration, and trigger conditions:
-   - Is the trigger condition ("Use when...") distinct and unambiguous?
-   - Are expected behaviors stated directly and positively?
-   - Can instructions be compacted further?
-3. **Avoid Defensive Phrasing**: Do not introduce defensive vocabulary (e.g., "never under any circumstances", "strictly forbidden"). The objective is constructive alignment, not defensive obstruction.
+1. **Retrospective Question**:
+   - Ask: *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+   - Focus on concrete friction, unexpected discovery paths, or missing project context.
+2. **Skill ROI Evaluation**:
+   - For every skill invoked: did it save task time and tokens, or did it cause detours and reading unnecessary files?
+   - If a skill forced excess context loading or confusing detours, mark it for pruning or refactoring.
+3. **Calibrate via `solid-loop`**:
+   - Invoke `solid-loop` to refine, tune, scaffold, or prune instructions and skills.
+   - Ensure expected behaviors are stated directly and positively, avoiding defensive red lines.
