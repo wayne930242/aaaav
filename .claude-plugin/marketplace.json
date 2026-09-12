@@ -1,5 +1,8 @@
 {
   "name": "aaaavr",
+  "owner": {
+    "name": "Wei Hung"
+  },
   "metadata": {
     "version": "0.2.0",
     "description": "Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex"
@@ -8,6 +11,7 @@
     {
       "name": "aaaavr",
       "version": "0.2.0",
+      "description": "Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex",
       "source": "./"
     }
   ]

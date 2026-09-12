@@ -10,7 +10,6 @@
     "agent-workflow",
     "streamlined-skills",
     "claude-code"
-  ],
-  "skills": "./skills/",
-  "hooks": "./hooks/hooks.json"
+  ]
 }
+

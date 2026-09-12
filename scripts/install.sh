@@ -78,6 +78,7 @@ link_target() {
 # 1. Antigravity installation
 install_agy() {
     echo "=== Installing for Antigravity ==="
+    rm -rf "$HOME/.gemini/config/plugins/aaaav-loop-boot" "$HOME/.gemini/config/plugins/weihung-loop-boot"
     local agy_plugin_dir="$HOME/.gemini/config/plugins/aaaavr"
     link_target "$REPO_ROOT" "$agy_plugin_dir"
 }
@@ -85,8 +86,24 @@ install_agy() {
 # 2. Claude Code installation
 install_claude() {
     echo "=== Installing for Claude Code ==="
-    local claude_plugin_dir="$HOME/.claude/plugins/aaaavr"
-    link_target "$REPO_ROOT" "$claude_plugin_dir"
+    # Remove stale plugin artifacts
+    rm -rf "$HOME/.claude/plugins/aaaav-loop-boot" "$HOME/.claude/plugins/weihung-loop-boot"
+    if command -v claude >/dev/null 2>&1; then
+        if [ "$DRY_RUN" = true ]; then
+            echo "[DRY RUN] Would register marketplace and install aaaavr plugin via claude CLI"
+            return
+        fi
+        claude plugin uninstall weihung-loop-boot@weihung-loop-boot 2>/dev/null || true
+        claude plugin marketplace remove weihung-loop-boot 2>/dev/null || true
+        claude plugin uninstall aaaav-loop-boot@aaaav-loop-boot 2>/dev/null || true
+        claude plugin marketplace remove aaaav-loop-boot 2>/dev/null || true
+        claude plugin marketplace add "$REPO_ROOT" 2>/dev/null || claude plugin marketplace update aaaavr 2>/dev/null || true
+        claude plugin install aaaavr@aaaavr 2>/dev/null || claude plugin update aaaavr@aaaavr 2>/dev/null || true
+        echo "Claude Code plugin registered via claude CLI."
+    else
+        local claude_plugin_dir="$HOME/.claude/plugins/aaaavr"
+        link_target "$REPO_ROOT" "$claude_plugin_dir"
+    fi
 }
 
 # 3. Codex installation
