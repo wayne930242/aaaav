@@ -83,7 +83,7 @@ def main() -> None:
                 rel = target_path
 
             lines = "\n".join(f"  - {w}" for w in warnings)
-            msg = f"⚠ [aaaavr] Validation suggestions for {rel}:\n{lines}"
+            msg = f"⚠ [aaaav] Validation suggestions for {rel}:\n{lines}"
 
             if is_claude:
                 output = {
@@ -102,7 +102,7 @@ def main() -> None:
             print(json.dumps({}))
 
     except Exception as e:
-        sys.stderr.write(f"aaaavr hook error: {e}\n")
+        sys.stderr.write(f"aaaav hook error: {e}\n")
         print(json.dumps({}))
 
     sys.exit(0)

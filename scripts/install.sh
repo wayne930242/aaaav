@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installer script for aaaavr multi-platform plugin
+# Installer script for aaaav multi-platform plugin
 # Supports: Antigravity (agy), Claude Code (claude), OpenAI Codex (codex)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -78,8 +78,8 @@ link_target() {
 # 1. Antigravity installation
 install_agy() {
     echo "=== Installing for Antigravity ==="
-    rm -rf "$HOME/.gemini/config/plugins/aaaav-loop-boot" "$HOME/.gemini/config/plugins/weihung-loop-boot"
-    local agy_plugin_dir="$HOME/.gemini/config/plugins/aaaavr"
+    rm -rf "$HOME/.gemini/config/plugins/aaaavr" "$HOME/.gemini/config/plugins/aaaav-loop-boot" "$HOME/.gemini/config/plugins/weihung-loop-boot"
+    local agy_plugin_dir="$HOME/.gemini/config/plugins/aaaav"
     link_target "$REPO_ROOT" "$agy_plugin_dir"
 }
 
@@ -87,21 +87,23 @@ install_agy() {
 install_claude() {
     echo "=== Installing for Claude Code ==="
     # Remove stale plugin artifacts
-    rm -rf "$HOME/.claude/plugins/aaaav-loop-boot" "$HOME/.claude/plugins/weihung-loop-boot"
+    rm -rf "$HOME/.claude/plugins/aaaavr" "$HOME/.claude/plugins/aaaav-loop-boot" "$HOME/.claude/plugins/weihung-loop-boot"
     if command -v claude >/dev/null 2>&1; then
         if [ "$DRY_RUN" = true ]; then
-            echo "[DRY RUN] Would register marketplace and install aaaavr plugin via claude CLI"
+            echo "[DRY RUN] Would register marketplace and install aaaav plugin via claude CLI"
             return
         fi
+        claude plugin uninstall aaaavr@aaaavr 2>/dev/null || true
+        claude plugin marketplace remove aaaavr 2>/dev/null || true
         claude plugin uninstall weihung-loop-boot@weihung-loop-boot 2>/dev/null || true
         claude plugin marketplace remove weihung-loop-boot 2>/dev/null || true
         claude plugin uninstall aaaav-loop-boot@aaaav-loop-boot 2>/dev/null || true
         claude plugin marketplace remove aaaav-loop-boot 2>/dev/null || true
-        claude plugin marketplace add "$REPO_ROOT" 2>/dev/null || claude plugin marketplace update aaaavr 2>/dev/null || true
-        claude plugin install aaaavr@aaaavr 2>/dev/null || claude plugin update aaaavr@aaaavr 2>/dev/null || true
+        claude plugin marketplace add "$REPO_ROOT" 2>/dev/null || claude plugin marketplace update aaaav 2>/dev/null || true
+        claude plugin install aaaav@aaaav 2>/dev/null || claude plugin update aaaav@aaaav 2>/dev/null || true
         echo "Claude Code plugin registered via claude CLI."
     else
-        local claude_plugin_dir="$HOME/.claude/plugins/aaaavr"
+        local claude_plugin_dir="$HOME/.claude/plugins/aaaav"
         link_target "$REPO_ROOT" "$claude_plugin_dir"
     fi
 }

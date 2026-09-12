@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Uninstaller script for aaaavr multi-platform plugin
+# Uninstaller script for aaaav multi-platform plugin
 # Supports: Antigravity (agy), Claude Code (claude), OpenAI Codex (codex)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,6 +56,7 @@ remove_target() {
 
 uninstall_agy() {
     echo "=== Uninstalling from Antigravity ==="
+    remove_target "$HOME/.gemini/config/plugins/aaaav"
     remove_target "$HOME/.gemini/config/plugins/aaaavr"
     remove_target "$HOME/.gemini/config/plugins/aaaav-loop-boot"
     remove_target "$HOME/.gemini/config/plugins/weihung-loop-boot"
@@ -65,8 +66,10 @@ uninstall_claude() {
     echo "=== Uninstalling from Claude Code ==="
     if command -v claude >/dev/null 2>&1; then
         if [ "$DRY_RUN" = true ]; then
-            echo "[DRY RUN] Would uninstall aaaavr and old plugins via claude CLI"
+            echo "[DRY RUN] Would uninstall aaaav and old plugins via claude CLI"
         else
+            claude plugin uninstall aaaav@aaaav 2>/dev/null || true
+            claude plugin marketplace remove aaaav 2>/dev/null || true
             claude plugin uninstall aaaavr@aaaavr 2>/dev/null || true
             claude plugin marketplace remove aaaavr 2>/dev/null || true
             claude plugin uninstall aaaav-loop-boot@aaaav-loop-boot 2>/dev/null || true
@@ -75,6 +78,7 @@ uninstall_claude() {
             claude plugin marketplace remove weihung-loop-boot 2>/dev/null || true
         fi
     fi
+    remove_target "$HOME/.claude/plugins/aaaav"
     remove_target "$HOME/.claude/plugins/aaaavr"
     remove_target "$HOME/.claude/plugins/aaaav-loop-boot"
     remove_target "$HOME/.claude/plugins/weihung-loop-boot"

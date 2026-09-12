@@ -1,1 +1,1 @@
-"""Test suite for aaaavr."""
+"""Test suite for aaaav."""

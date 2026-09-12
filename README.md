@@ -1,6 +1,6 @@
-# aaaavr
+# aaaav
 
-Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex.
+Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex.
 
 ## Concept
 

@@ -1,6 +1,6 @@
-# Agent Working Agreements: aaaavr
+# Agent Working Agreements: aaaav
 
-This repository defines a streamlined, multi-platform AAAAVR plugin for Antigravity, Claude Code, and Codex.
+This repository defines a streamlined, multi-platform AAAAV plugin for Antigravity, Claude Code, and Codex.
 
 ## Core Directives
 
