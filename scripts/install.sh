@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installer script for aaaav-loop-boot multi-platform plugin
+# Installer script for aaaavr multi-platform plugin
 # Supports: Antigravity (agy), Claude Code (claude), OpenAI Codex (codex)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -78,14 +78,14 @@ link_target() {
 # 1. Antigravity installation
 install_agy() {
     echo "=== Installing for Antigravity ==="
-    local agy_plugin_dir="$HOME/.gemini/config/plugins/aaaav-loop-boot"
+    local agy_plugin_dir="$HOME/.gemini/config/plugins/aaaavr"
     link_target "$REPO_ROOT" "$agy_plugin_dir"
 }
 
 # 2. Claude Code installation
 install_claude() {
     echo "=== Installing for Claude Code ==="
-    local claude_plugin_dir="$HOME/.claude/plugins/aaaav-loop-boot"
+    local claude_plugin_dir="$HOME/.claude/plugins/aaaavr"
     link_target "$REPO_ROOT" "$claude_plugin_dir"
 }
 

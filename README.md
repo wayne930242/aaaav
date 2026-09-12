@@ -1,6 +1,6 @@
-# aaaav-loop-boot
+# aaaavr
 
-Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex.
+Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex.
 
 ## Concept
 

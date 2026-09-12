@@ -1,14 +1,14 @@
 [project]
-name = "aaaav-loop-boot"
-version = "0.1.0"
-description = "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
+name = "aaaavr"
+version = "0.2.0"
+description = "Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Wei Hung" }
 ]
 license = { text = "MIT" }
-keywords = ["aaaav", "agent-workflow", "streamlined-skills", "antigravity", "claude-code", "codex"]
+keywords = ["aaaavr", "agent-workflow", "streamlined-skills", "antigravity", "claude-code", "codex"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

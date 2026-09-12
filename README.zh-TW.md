@@ -1,6 +1,6 @@
-# aaaav-loop-boot
+# aaaavr
 
-精簡化的 AAAAV Agent 工作流程插件，支援 Antigravity、Claude Code 與 Codex。
+精簡化的 AAAAVR Agent 工作流程插件，支援 Antigravity、Claude Code 與 Codex。
 
 ## 概念
 

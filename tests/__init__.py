@@ -1,1 +1,1 @@
-"""Test suite for aaaav-loop-boot."""
+"""Test suite for aaaavr."""

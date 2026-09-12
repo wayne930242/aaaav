@@ -80,3 +80,14 @@ to clear.
 
 **Complete when:** no change was requested, or `aaaav-do` has received a
 confirmed correction target.
+
+## 5. Reflexive System Placement
+
+When human feedback conveys a design choice, architectural taste, or personal preference rather than an isolated code bug, hold a reflection point to place this single consideration into the correct location within the agent system:
+
+1. **Isolate the Single Consideration**: Extract the exact preference or convention the person expressed without expanding into unrequested rules.
+2. **Identify the Native Destination**:
+   - **Personal or Interaction Preference**: Place in user-level rules, `model-preference-profile.md`, or session guidance.
+   - **Project Design or Architectural Convention**: Place directly into `AGENTS.md` or `CLAUDE.md`.
+   - **Procedural Workflow**: Tune or prune the specific skill involved.
+3. **Integrate Directly**: State the expected behavior positively and concisely in that single authoritative location. Avoid duplicate copies or defensive restrictions.

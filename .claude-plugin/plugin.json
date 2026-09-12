@@ -1,11 +1,11 @@
 {
-  "name": "aaaav-loop-boot",
-  "version": "0.1.0",
-  "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, and durable reviews without defensive bloat.",
+  "name": "aaaavr",
+  "version": "0.2.0",
+  "description": "Streamlined AAAAVR agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, in-flight friction capture, and reflexive reviews without defensive bloat.",
   "author": { "name": "Wei Hung" },
   "license": "MIT",
   "keywords": [
-    "aaaav",
+    "aaaavr",
     "loop",
     "agent-workflow",
     "streamlined-skills",
