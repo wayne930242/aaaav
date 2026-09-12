@@ -57,7 +57,7 @@ Choose it from the task, user, and target project. The method inside may use an 
 
 ## Act
 
-The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary.
+The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary. When major friction or detours occur during implementation, record them directly in `design.md` under `## Friction Notes` for Durable work, or in `scratch/friction.md` for Inline work.
 
 ## Verify
 
@@ -69,13 +69,14 @@ Give every requirement in the contract its own `Requirement | Evidence | Result`
 
 ### 2. Reflexive Pass
 
-After functional verification, conduct a scoped reflection limited strictly to the rules, `AGENTS.md` / `CLAUDE.md`, and skills actually used during this run:
+Apply the **Friction Gate**:
 
-1. **Retrospective Question**: Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
-2. **Skill ROI Evaluation**: Audit whether each skill used helped save task time and tokens, or whether it caused detours and reading unnecessary files.
-3. **Agent System Calibration**: Invoke `solid-loop` to adjust, scaffold, or prune rules and skills based on the retrospective findings. Avoid defensive phrasing or prohibitive red lines.
+- **Default Path (Clean Run)**: When no friction notes exist in `design.md` (or `scratch/friction.md`) and execution was smooth, record: `Reflexive: Clean run, no friction or detours.` Complete immediately without reading extra files or invoking `solid-loop`.
+- **Exception Path (Obvious Friction Only)**: When friction notes exist or tangible friction occurred (e.g. read unneeded files due to misleading context pointers, suffered multi-turn detours from ambiguous triggers, or hit a missing critical invariant):
+  1. Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+  2. Invoke `solid-loop` to surgically prune, tune, or scaffold the affected skill or instruction based on the recorded friction.
 
-**Complete when:** every requirement has credible evidence from its chosen anchor, the reflexive pass has reviewed used system assets, and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
+**Complete when:** every requirement has credible evidence from its chosen anchor, the reflexive gate has recorded its outcome, and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
 
 ## Standards and References
 

@@ -20,14 +20,27 @@ Before editing code for durable tasks, verify core foundations:
 
 ## 3. Reflexive Review (During Verification)
 
-After exercising the reality anchor, run a scoped Reflexive pass. Limit this review strictly to rules, `AGENTS.md` / `CLAUDE.md`, and skills actually used during the task:
+After exercising the reality anchor, run a scoped Reflexive pass. Limit this review strictly to rules, `AGENTS.md` / `CLAUDE.md`, and skills actually used during the task.
 
-1. **Retrospective Question**:
-   - Ask: *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
-   - Focus on concrete friction, unexpected discovery paths, or missing project context.
-2. **Skill ROI Evaluation**:
-   - For every skill invoked: did it save task time and tokens, or did it cause detours and reading unnecessary files?
-   - If a skill forced excess context loading or confusing detours, mark it for pruning or refactoring.
-3. **Calibrate via `solid-loop`**:
-   - Invoke `solid-loop` to refine, tune, scaffold, or prune instructions and skills.
-   - Ensure expected behaviors are stated directly and positively, avoiding defensive red lines.
+### In-Flight Friction Capture (During Act)
+
+When major friction or confusing detours occur while implementing:
+- **Durable Work**: Record them directly under `## Friction Notes` in `design.md` (the implementation handoff document).
+- **Inline Work**: Record them in a lightweight scratch file (e.g. `scratch/friction.md`).
+
+This captures real runtime evidence at the moment it happens, removing retrospective guesswork.
+
+### The Friction Gate (Early Exit)
+
+- **Clean Run**: When no friction notes exist and execution was smooth, record: `Reflexive: Clean run, no friction or detours.` Complete immediately without invoking `solid-loop` or reading extra files.
+- **Obvious Friction Only**: When friction notes exist or tangible trajectory evidence demonstrates friction:
+  - Misleading context pointers that caused reading unneeded files.
+  - Ambiguous skill triggers that led to multi-turn detours.
+  - Missing project invariants that forced trial-and-error discovery.
+
+### Action Priority
+
+1. **Retrospective Question**: Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+2. **Prune**: Remove unneeded references, sediment, and noisy context pointers.
+3. **Tune**: Adjust the single ambiguous trigger or completion criterion in place based on the recorded friction.
+4. **Scaffold (Rare)**: Bootstrap a minimal skill only when a recurring operational procedure was absent and caused major detours.

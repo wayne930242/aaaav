@@ -30,7 +30,7 @@ Approved from: <the user reply that approved it, empty while proposed>
 
 ## `design.md`
 
-Chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. This is the implementation-ready handoff -- a straightforward design may be short, but it still names precedent and seam.
+Chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. This is the implementation-ready handoff -- a straightforward design may be short, but it still names precedent and seam. When major friction occurs during Act, append it under `## Friction Notes`.
 
 ## `verification.md`
 

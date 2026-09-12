@@ -10,8 +10,8 @@ Modern foundation models are capable pair programmers. They do not require endle
    - **Align**: Restate intent in user terms; classify as **Inline** (fast, localized) or **Durable** (architectural, cross-session).
    - **Advance**: `Decision → Spec → Design` for Durable work. Focus on contracts, seams, and decisions; no upfront skill scaffolding.
    - **Anchor**: Name the reality anchor and checkpoint before the first production edit.
-   - **Act**: Implement surgical changes through native project practices.
-   - **Verify**: Exercise the anchor and report observations in `Requirement | Evidence | Result` tables. Run a scoped **Reflexive** pass on rules, `AGENTS.md`/`CLAUDE.md`, and skills used during the run.
+   - **Act**: Implement surgical changes through native project practices; optionally jot down major friction in `design.md` (`## Friction Notes`) or `scratch/friction.md` for Inline work.
+   - **Verify**: Exercise the anchor and report observations in `Requirement | Evidence | Result` tables. Run a scoped **Reflexive** pass checking friction notes, with a default clean-run early exit.
 2. **`solid-loop`** (Agent System Reflexive Audit & Solidification):
    - Invoked during the Verify Reflexive pass to audit skills and instructions used in the task.
    - Evaluates whether skills saved task time and tokens, or caused detours and reading unnecessary files.

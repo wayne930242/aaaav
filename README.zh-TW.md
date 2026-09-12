@@ -10,8 +10,8 @@
    - **Align（對齊）**：用使用者語言重述需求，劃分 **Inline**（局部快速修改）或 **Durable**（持久性架構決策）。
    - **Advance（推進）**：Durable 任務依循 `Decision → Spec → Design` 推進；專注於合約、接縫與決策收斂，Advance 階段不再預先建立或腳手架 skill。
    - **Anchor（定錨）**：在第一筆生產代碼修改前宣告 Reality Anchor（真實反饋錨點）與 Checkpoint。
-   - **Act（實作）**：遵循目標專案原生規範，微小且精準地實作。
-   - **Verify（驗證）**：執行錨點並以 `Requirement | Evidence | Result` 三欄表記錄觀察事實。接著進行 **Reflexive（反思）** 流程，範圍僅限於本次任務中使用到的 rules、`AGENTS.md`/`CLAUDE.md` 與 skills。
+   - **Act（實作）**：遵循目標專案原生規範，微小且精準地實作；若遇較大摩擦可順手記錄於 `design.md`（`## Friction Notes`），Inline 模式則記於額外暫存檔（如 `scratch/friction.md`）。
+   - **Verify（驗證）**：執行錨點並以 `Requirement | Evidence | Result` 三欄表記錄觀察事實。接著進行 **Reflexive（反思）** 流程，檢查摩擦記錄；無摩擦時直接早退，不造成額外系統負擔。
 2. **`solid-loop`**（Agent System 反思審計與固化）：
    - 於 Verify 的 Reflexive 流程中調用，檢討本次任務實際使用到的技能與系統指令。
    - 核心審計標準：檢討該技能究竟是「幫助我們節省任務時間與 token，還是反而讀取了不必要的檔案和繞遠路？」
