@@ -4,7 +4,7 @@ Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex.
 
 ## Concept
 
-Modern foundation models are capable pair programmers. They do not require endless defensive "red lines" or exhaustive error logs. This plugin establishes high-density, actionable workflows centered on two streamlined skills:
+Modern foundation models are capable pair programmers. They do not require endless defensive "red lines" or exhaustive error logs. This plugin establishes high-density, actionable workflows centered on three streamlined skills:
 
 1. **`aaaav-do`** (Development Loop):
    - **Align**: Restate intent in user terms; classify as **Inline** (fast, localized) or **Durable** (architectural, cross-session).
@@ -17,6 +17,11 @@ Modern foundation models are capable pair programmers. They do not require endle
    - Evaluates whether skills saved task time and tokens, or caused detours and reading unnecessary files.
    - Centers on the retrospective question: *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
    - Keeps skills self-contained and under 300 lines (official standard) by inlining high-priority operational references.
+3. **`boot-loop`** (Agent System Bootstrapping & Overhaul):
+   - Bootstraps or refactors a project's agent system grounded in empirical evidence rather than speculation.
+   - Dispatches independent workers running critical investigative jobs via `aaaav-do`.
+   - Harvests runtime `Friction Notes` from each worker's trajectory.
+   - Executes a single, consolidated `solid-loop` pass to scaffold, tune, and solidify `AGENTS.md`, `CLAUDE.md`, and project skills.
 
 ## Usage
 
