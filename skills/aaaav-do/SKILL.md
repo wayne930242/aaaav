@@ -57,7 +57,15 @@ Choose it from the task, user, and target project. The method inside may use an 
 
 ## Act
 
-The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary. When major friction or detours occur during implementation, record them directly in `design.md` under `## Friction Notes` for Durable work, or in `scratch/friction.md` for Inline work.
+The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary.
+
+### In-Flight Friction Capture
+
+When major friction or confusing detours occur while implementing:
+- **Durable Work**: Record them directly under `## Friction Notes` in `design.md` (the implementation handoff document).
+- **Inline Work**: Record them in a lightweight scratch file (e.g. `scratch/friction.md`).
+
+Capturing real friction in flight provides objective evidence for the Friction Gate in Verify, eliminating retrospective guesswork.
 
 ## Verify
 
@@ -65,7 +73,28 @@ The harness-native plan owns sequencing. Follow the target project's native prac
 
 Exercise the chosen reality anchor and capture what it observed. Then review the diff separately against project standards, the approved contract, and the confirmed domain model. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
 
-Give every requirement in the contract its own `Requirement | Evidence | Result` row, where `Result` is `pass`, `fail`, or `unknown` and `Evidence` names the real interface exercised and what it observed. A green suite, a passing unrelated check, or an agent's claim of completion is not evidence for a requirement nothing exercised; that requirement stays `unknown`.
+#### Verification Table Format
+
+Give every requirement in the contract its own `Requirement | Evidence | Result` row:
+
+| Requirement | Evidence | Result |
+|---|---|---|
+| Observable behavior or contract from spec | Real interface executed and the specific output observed | pass / fail / unknown |
+
+- **pass**: The chosen reality anchor ran against the actual implementation and directly observed the expected behavior.
+- **fail**: The anchor executed and observed a deviation from the contract or an error.
+- **unknown**: The requirement was not directly exercised by an anchor in this run. A green test suite or passing unrelated check does not count as evidence for an unexercised requirement.
+
+#### Distinct Verification Claims
+
+Maintain clear boundaries between verification claims:
+- Local automated test runs (e.g. `pytest`, `npm test`)
+- Build and compilation checks
+- Interactive or CLI execution evidence
+- Browser / UI rendered inspection
+- Deployment or release status
+
+Do not conflate a local passing test with end-to-end integration or live deployment verification.
 
 ### 2. Reflexive Pass
 
@@ -74,15 +103,28 @@ Apply the **Friction Gate**:
 - **Default Path (Clean Run)**: When no friction notes exist in `design.md` (or `scratch/friction.md`) and execution was smooth, record: `Reflexive: Clean run, no friction or detours.` Complete immediately without reading extra files or invoking `solid-loop`.
 - **Exception Path (Obvious Friction Only)**: When friction notes exist or tangible friction occurred (e.g. read unneeded files due to misleading context pointers, suffered multi-turn detours from ambiguous triggers, or hit a missing critical invariant):
   1. Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
-  2. Invoke `solid-loop` to surgically prune, tune, or scaffold the affected skill or instruction based on the recorded friction.
+  2. Action Priority: Prune > Tune > Scaffold (Rare).
+  3. Invoke `solid-loop` to surgically prune, tune, or scaffold the affected skill or instruction based on the recorded friction.
 
 **Complete when:** every requirement has credible evidence from its chosen anchor, the reflexive gate has recorded its outcome, and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
+
+## Core Communication Rules
+
+1. **Show Your Reasoning**: When proposing designs, architecture, or non-obvious fixes, explain the underlying logic so the user can verify your thought process.
+2. **Proactively Report Problems**: Point out suboptimal code patterns, architectural seams, or missing safeguards immediately, even when not explicitly asked.
+3. **Direct and Concise**: State facts and findings plainly. Omit conversational filler, apologies, and sycophantic phrasing.
+4. **State Expected Behavior Directly**: Describe what the system should do. Avoid defensive warnings, prohibitive lists, or speculative guardrails.
+5. **Language Separation**: User communication in Traditional Chinese; code, tests, prompts, and internal skill instructions in English.
+6. **Handling Ambiguity**: Distinguish true user-owned decisions from delegated execution decisions. For delegated tasks, make the decision and proceed. For user-owned forks, present options and tradeoffs concisely.
+
+## Core Documentation Rules
+
+1. **Single-Pass Readability**: Structure documents so a human or agent can comprehend the intent and scope in one reading pass.
+2. **Link Rather Than Copy**: Link directly to source files, line ranges, issues, or parent specifications. Do not duplicate code blocks or requirements across multiple files.
+3. **Direct Tone**: Explain what components do, their contracts, and their interfaces. Avoid defensive prose, speculative disclaimers, or excessive historical background.
+4. **Prevent Infinite Expansion**: Avoid accumulating reactive micro-rules for transient slips. Maintain a light, stable instruction set.
 
 ## Standards and References
 
 - [MINI-SDD Contract](MINI-SDD.md)
 - [Debugging Branch](DEBUGGING.md)
-- [Reporting Standards](references/reporting.md)
-- [Communication Guidelines](references/communication.md)
-- [Documentation Standards](references/documentation.md)
-- [Durable Review & Pre-Flight Standards](references/durable-review.md)

@@ -16,8 +16,7 @@ Modern foundation models are capable pair programmers. They do not require endle
    - Invoked during the Verify Reflexive pass to audit skills and instructions used in the task.
    - Evaluates whether skills saved task time and tokens, or caused detours and reading unnecessary files.
    - Centers on the retrospective question: *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
-   - Tunes, scaffolds, or prunes agent system instructions to solidify predictability without defensive bloat.
-   - Keeps skills under 120 lines via progressive disclosure to `references/`.
+   - Keeps skills self-contained and under 300 lines (official standard) by inlining high-priority operational references.
 
 ## Usage
 

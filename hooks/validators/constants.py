@@ -3,8 +3,8 @@
 # Allowed fields in SKILL.md YAML frontmatter
 SKILL_ALLOWED_FIELDS = frozenset({"name", "description"})
 
-# Maximum recommended lines for a streamlined SKILL.md before progressive disclosure to references/
-SKILL_MAX_RECOMMENDED_LINES = 120
+# Maximum recommended lines for a self-contained SKILL.md before progressive disclosure (official standard: 300 lines)
+SKILL_MAX_RECOMMENDED_LINES = 300
 
 # Defensive phrasing patterns to discourage (encourage stating expected behavior directly)
 DEFENSIVE_PATTERNS = [
