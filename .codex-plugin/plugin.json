@@ -1,7 +1,7 @@
 {
   "name": "aaaav",
-  "version": "0.3.0",
-  "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, in-flight friction capture, and reflexive reviews without defensive bloat.",
+  "version": "0.4.0",
+  "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, trial-and-error friction notes, and reflexive reviews.",
   "author": {
     "name": "Wei Hung"
   },
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "aaaav",
     "shortDescription": "Streamlined AAAAV agent workflow plugin",
-    "longDescription": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, in-flight friction capture, and reflexive reviews without defensive bloat.",
+    "longDescription": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, trial-and-error friction notes, and reflexive reviews.",
     "developerName": "Wei Hung",
     "category": "Productivity",
     "capabilities": [

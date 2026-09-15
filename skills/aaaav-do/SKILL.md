@@ -59,13 +59,16 @@ Choose it from the task, user, and target project. The method inside may use an 
 
 The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary.
 
-### In-Flight Friction Capture
+### Friction Notes
 
-When major friction or confusing detours occur while implementing:
-- **Durable Work**: Record them directly under `## Friction Notes` in `design.md` (the implementation handoff document).
-- **Inline Work**: Record them in a lightweight scratch file (e.g. `scratch/friction.md`).
+A friction note records what the run discovered through trial and error.
+Each time an attempt fails and a later attempt reveals why (a command errors, a file sits elsewhere, an assumption proves wrong), append a note before continuing:
 
-Capturing real friction in flight provides objective evidence for the Friction Gate in Verify, eliminating retrospective guesswork.
+    - Tried: <the attempt that failed>
+      Found: <what the failure revealed>
+      Led by: <the skill or instruction line that prompted the attempt, or `none`>
+
+Durable work appends notes under `## Friction Notes` in `design.md`; inline work appends them to `scratch/friction.md`.
 
 ## Verify
 
@@ -98,15 +101,15 @@ Do not conflate a local passing test with end-to-end integration or live deploym
 
 ### 2. Reflexive Pass
 
-Apply the **Friction Gate**:
+Read the friction notes and classify each one:
 
-- **Default Path (Clean Run)**: When no friction notes exist in `design.md` (or `scratch/friction.md`) and execution was smooth, record: `Reflexive: Clean run, no friction or detours.` Complete immediately without reading extra files or invoking `solid-loop`.
-- **Exception Path (Obvious Friction Only)**: When friction notes exist or tangible friction occurred (e.g. read unneeded files due to misleading context pointers, suffered multi-turn detours from ambiguous triggers, or hit a missing critical invariant):
-  1. Ask *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
-  2. Action Priority: Prune > Tune > Scaffold (Rare).
-  3. Invoke `solid-loop` to surgically prune, tune, or scaffold the affected skill or instruction based on the recorded friction.
+- **misdirection**: the `Led by` instruction states or implies something the `Found` line contradicts.
+- **gap**: no instruction in use states the `Found` fact, so the run detoured to find it.
 
-**Complete when:** every requirement has credible evidence from its chosen anchor, the reflexive gate has recorded its outcome, and every remaining gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
+With no notes, record `Reflexive: clean run.` and finish the pass.
+Otherwise invoke `solid-loop` with the classified notes.
+
+**Complete when:** every requirement has credible evidence from its chosen anchor, every friction note is classified and applied through `solid-loop` (or the clean run is recorded), and every remaining verification gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
 
 ## Core Communication Rules
 
@@ -122,7 +125,7 @@ Apply the **Friction Gate**:
 1. **Single-Pass Readability**: Structure documents so a human or agent can comprehend the intent and scope in one reading pass.
 2. **Link Rather Than Copy**: Link directly to source files, line ranges, issues, or parent specifications. Do not duplicate code blocks or requirements across multiple files.
 3. **Direct Tone**: Explain what components do, their contracts, and their interfaces. Avoid defensive prose, speculative disclaimers, or excessive historical background.
-4. **Prevent Infinite Expansion**: Avoid accumulating reactive micro-rules for transient slips. Maintain a light, stable instruction set.
+4. **Stable Instruction Set**: Keep instructions light; a one-time slip gets no new rule.
 
 ## Standards and References
 

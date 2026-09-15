@@ -7,7 +7,7 @@ description: Use when bootstrapping or overhauling an agent system by dispatchin
 
 Bootstrap or overhaul a project's agent system from empirical evidence gathered by parallel investigative workers.
 
-Rather than guessing rules or scaffolding arbitrary skills up front, `boot-loop` probes the actual codebase through focused investigation tasks, gathers concrete friction, and executes a single consolidated `solid-loop` pass to establish a predictable, lean harness.
+`boot-loop` probes the codebase through focused investigation tasks, collects the friction notes they produce, and runs one `solid-loop` pass on them.
 
 ## Workflow
 
@@ -26,29 +26,17 @@ Each job must have a concrete, falsifiable objective.
 Dispatch isolated subagents or background workers for each target:
 
 - Each worker follows **`aaaav-do`** (Align → Advance → Anchor → Act → Verify).
-- Instruct each worker to record concrete runtime friction into its `Friction Notes` (e.g. `scratch/friction.md` or `design.md`):
-  - Where did the worker stall or take unproductive detours?
-  - Which files or context pointers caused wasted reads?
-  - What missing domain invariants or command conventions forced trial-and-error?
+- Each worker records and classifies friction notes as `aaaav-do` defines them, then returns the classified notes instead of invoking `solid-loop`.
 
 Wait for workers to complete their designated investigation runs.
 
-### 3. Harvest and Synthesize Friction Notes
+### 3. Merge Friction Notes
 
-Collect the `Friction Notes` and trajectories from all completed workers:
+Collect the classified notes from all completed workers and merge notes whose `Found` lines state the same fact.
 
-1. **Group Shared Detours**: Identify recurring obstacles (e.g. multiple workers failed to locate the test runner or misidentified project layout).
-2. **Filter Noise**: Separate transient slips from systemic gaps. Keep only high-signal friction backed by trajectory evidence.
-3. **Anchor on Retrospection**: Synthesize with the core question:
-   > *"What should any agent entering this project know upfront to eliminate these detours?"*
+### 4. Run One `solid-loop` Pass
 
-### 4. Execute Consolidated `solid-loop` Pass
-
-Run a single, authoritative `solid-loop` cycle on the synthesized findings:
-
-- **Prune**: Cut misleading instructions, stale configuration references, or bloat from existing rules and skills.
-- **Tune Root Files**: Update `AGENTS.md` / `CLAUDE.md` with verified reality anchors, project build/test commands, and non-negotiable conventions (stated directly and positively).
-- **Scaffold Core Skills (if needed)**: Bootstrap lean skills for recurring, non-trivial workflows identified by workers using [solid-loop's template](../solid-loop/references/template-skill.md).
+Apply the merged notes through a single `solid-loop` pass.
 
 ### 5. Verify Agent System Integrity
 
@@ -58,5 +46,5 @@ Run a single, authoritative `solid-loop` cycle on the synthesized findings:
    - Expected behaviors are stated directly without defensive phrasing.
 2. Emit a concise completion summary listing:
    - Workers dispatched and jobs executed.
-   - Synthesized friction points addressed.
+   - Friction notes applied and their actions.
    - Updated or created agent system components.

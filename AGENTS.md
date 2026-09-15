@@ -6,7 +6,7 @@ This repository defines a streamlined, multi-platform AAAAV plugin for Antigravi
 
 - All prompts, agent instructions, and code comments must be in English.
 - User communication must always be in Traditional Chinese (繁體中文).
-- Prompts, documentation, and guidelines must directly state expected behavior. Avoid unnecessary defensive phrasing, prohibitive lists, and endless red lines.
+- Prompts, documentation, and guidelines state expected behavior directly, without defensive phrasing or prohibitive lists.
 - Source-changing work follows AAAAV: Align → Advance → Anchor → Act → Verify (with Reflexive pass).
 - Establish the reality anchor and checkpoint before the first production edit.
 - Commit messages must not mention AI tools.

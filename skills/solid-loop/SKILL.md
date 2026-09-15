@@ -1,74 +1,61 @@
 ---
 name: solid-loop
-description: Use when auditing, tuning, or refactoring agent skills and instructions used during a task to reduce friction and detours.
+description: Use when applying friction notes to agent skills and instructions, or when auditing a skill for sprawl.
 ---
 
 # Solid Loop
 
-Audit, tune, and maintain the agent system for predictability, efficiency, and minimal friction.
+Correct the agent system from friction notes while keeping every skill as small as the fix allows.
 
-The root virtue is **predictability and efficiency** -- ensuring agent instructions save task time and tokens rather than causing detours or reading unnecessary files.
+The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read.
 
-## The Friction Gate (Anti-Over-Reflection)
+## Apply Friction Notes
 
-Act only on **obvious findings backed by trajectory evidence**:
-- The agent read unneeded files due to misleading context pointers.
-- Ambiguous skill triggers caused false invocations or multi-turn detours.
-- Missing core project invariants forced repeated trial-and-error.
+Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` reflexive pass.
 
-If friction was minor, transient, or speculative, exit immediately without making edits.
+1. **Correct each misdirection.** Open the line named in `Led by`. Rewrite it to state what `Found` established, or delete it when the line has no correct form.
+2. **Place each gap.** Search the agent system for a statement of the `Found` fact.
+   - When one exists, the run could not reach it: sharpen the context pointer or description that should have led there.
+   - When none exists, write the fact as one direct sentence in its owning location: project facts in `AGENTS.md` or `CLAUDE.md`, procedure in the skill that ran the step.
+   - Scaffold a new skill from [references/template-skill.md](references/template-skill.md) only when the gap is a multi-step procedure that no skill owns.
+   - A fact the change itself resolved, or a general tool-use slip that no project or skill owns, needs no placement.
+3. **Hold the size.** Run the no-op test on every section you edited and delete each sentence that fails. Keep each `SKILL.md` under 300 lines; disclose reference into `references/` when it grows past that.
 
-Anchor the audit on one guiding question:
+**Complete when:** every note has an action or is marked resolved by the change, and every edited section has passed the no-op test.
 
-> *"What did I wish I knew earlier that would have reduced friction and detours in this run?"*
+## Audit for Sprawl
 
-## Action Priority: Pruning First
+Without friction notes, audit the named skill with the craft levers below, then run step 3.
 
-1. **Prune (Highest Priority)**: Remove references that caused unneeded file reading; eliminate sediment and no-op sentences.
-2. **Tune**: Surgically update the single ambiguous trigger sentence or completion criterion in place.
-3. **Scaffold (Rare)**: Bootstrap a minimal, lean skill via [references/template-skill.md](references/template-skill.md) only when a recurring operational procedure was absent and caused major detours.
+## Craft Levers
 
-## Information Hierarchy and Craft Levers
+Organize skill content on three tiers:
 
-Organize skill content into three tiers:
+1. **In-skill steps** in `SKILL.md`: ordered actions, each ending on a checkable completion criterion.
+2. **In-skill reference** in `SKILL.md`: co-located definitions, rules, and core tables.
+3. **Disclosed reference** in `references/`: templates and deep catalogs reached through explicit context pointers.
 
-1. **In-Skill Steps**: Primary tier in `SKILL.md`. Ordered operational sequences that guide the agent, ending in checkable completion criteria.
-2. **In-Skill Reference**: Secondary tier in `SKILL.md`. Co-located definitions, rules, and core tables. Keep `SKILL.md` under 300 lines (official self-contained skill standard).
-3. **Disclosed Reference**: Tertiary tier in `references/`. Auxiliary templates or deep reference catalogs reached via explicit context pointers.
+- **Leading words**: Anchor behavior with compact pretrained concepts (*tight*, *red*, *tracer*, *reality anchor*) instead of spelled-out explanations.
+- **Completion criteria**: Make each criterion checkable, and demanding enough to drive thorough legwork.
+- **No-op test**: Evaluate each sentence in isolation and delete the ones that do not change behavior relative to the model's default.
+- **Single source of truth**: Give each operational contract one canonical home.
+- **Positive steering**: State the target behavior. A prohibition names the unwanted pattern and makes it more likely, so rewrite it as the behavior to perform:
 
-### Steering Levers
-
-- **Leading Words**: Anchor behaviors using compact pretrained concepts (e.g., *tight*, *red*, *tracer*, *reality anchor*) rather than verbose explanations.
-- **Completion Criteria**: Keep bounds checkable to prevent premature completion, and demanding to drive thorough legwork.
-- **Positive Steering**: Direct statement of target behavior rather than listing prohibitions (avoiding the negation elephant).
-- **Sentence-by-Sentence No-Op Test**: Evaluate every sentence in isolation. Delete sentences that do not change behavior relative to the baseline.
-- **Single Source of Truth**: Retain one canonical home for each operational contract; eliminate duplicate rules across files.
-
-## Defensive Patterns vs. Expected Behavior
-
-Replace defensive prohibitions, endless red lines, and negative framing with concise, positive statements of expected behavior.
-
-### The Negation Anti-Pattern
-
-Negative steering ("do not think of an elephant") brings the forbidden concept into context, increasing the likelihood that the model acts on it. State the positive target behavior directly so the prohibited pattern is never primed.
-
-### Pattern Comparison
-
-| Negative Steering (Avoid) | Direct Expected Behavior (Use) | Rationale |
-|---|---|---|
-| "Forbidden to edit files without prior consent" | "State the contract and authorization before editing production code." | Clear operational trigger instead of fear-based prohibition. |
-| "Avoid making assumptions or guessing answers" | "Resolve uncertainty from project sources; ask only for genuine user-owned decisions." | Actionable hierarchy of resolution rather than paralysis. |
-| "Barred from writing complex code or adding extras" | "Implement the smallest solution that satisfies the contract. Avoid unsolicited features." | States the design objective positively. |
-| "Broken links and untested code are barred" | "Verify every local markdown link and run relevant test suites before completion." | Clear, verifiable task instead of emotional rhetoric. |
-| "Do not pretend to understand without checking" | "Ground claims in observed evidence from project files or reality anchors." | Positive epistemology based on evidence. |
+| Prohibition | Expected behavior |
+|---|---|
+| "Forbidden to edit files without prior consent" | "State the contract and authorization before editing production code." |
+| "Avoid making assumptions or guessing answers" | "Resolve uncertainty from project sources; ask only for genuine user-owned decisions." |
+| "Barred from writing complex code or adding extras" | "Implement the smallest solution that satisfies the contract." |
+| "Broken links and untested code are barred" | "Verify every local markdown link and run relevant test suites before completion." |
+| "Do not pretend to understand without checking" | "Ground claims in observed evidence from project files or reality anchors." |
 
 ## Output Contract
 
-Keep reflexive output concise (2-3 lines max):
+Report one pair per friction note:
 
 ```text
-Friction: <the specific detour or wasted context observed>
-Action: <pruned reference / tightened trigger / no-op>
+Friction: <Found> (misdirection | gap)
+Action: <corrected line | sharpened pointer | placed at <location> | resolved by the change>
 ```
 
 ## References

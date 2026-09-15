@@ -4,24 +4,20 @@
 
 ## 概念
 
-當前基底模型已具備成熟的代碼理解與協作能力，不再需要累積瑣碎的錯誤紀錄或拉設無窮無盡的防禦性「紅線」。本插件建立高密度且具備高可操作性的工作流，圍繞三大精簡技能：
+AAAAV 為 agent 提供一套簡短、可重複的工作流程，由三個 skill 組成：
 
-1. **`aaaav-do`**（AAAAV 開發循環）：
-   - **Align（對齊）**：用使用者語言重述需求，劃分 **Inline**（局部快速修改）或 **Durable**（持久性架構決策）。
-   - **Advance（推進）**：Durable 任務依循 `Decision → Spec → Design` 推進；專注於合約、接縫與決策收斂，Advance 階段不再預先建立或腳手架 skill。
-   - **Anchor（定錨）**：在第一筆生產代碼修改前宣告 Reality Anchor（真實反饋錨點）與 Checkpoint。
-   - **Act（實作）**：遵循目標專案原生規範，微小且精準地實作；若遇較大摩擦可順手記錄於 `design.md`（`## Friction Notes`），Inline 模式則記於額外暫存檔（如 `scratch/friction.md`）。
-   - **Verify（驗證）**：執行錨點並以 `Requirement | Evidence | Result` 三欄表記錄觀察事實。接著進行 **Reflexive（反思）** 流程，檢查摩擦記錄；無摩擦時直接早退，不造成額外系統負擔。
-2. **`solid-loop`**（Agent System 反思審計與固化）：
-   - 於 Verify 的 Reflexive 流程中調用，檢討本次任務實際使用到的技能與系統指令。
-   - 核心審計標準：檢討該技能究竟是「幫助我們節省任務時間與 token，還是反而讀取了不必要的檔案和繞遠路？」
-   - 以反思核心提問引導：「如果我早就知道什麼，就會在這次工作中減少摩擦和繞路？」
-   - 依重要性將核心參考規範內嵌於 Skill 主文，維持單次可讀性，並遵循官方建議放寬上限至 300 行。
-3. **`boot-loop`**（Agent 系統引導與重構循環）：
-   - 基於真實探索實證而非憑空臆測，建立或重構專案的 Agent 系統。
-   - 指派數個獨立 Worker 透過 `aaaav-do` 執行具備明確關鍵目標的調查任務（Investigating Jobs）。
-   - 彙整各 Worker 在執行過程中留下的 `Friction Notes`（摩擦記錄）。
-   - 發起單一次收斂性的 `solid-loop` 循環，依據實證結果建立或精煉 `AGENTS.md`、`CLAUDE.md` 與專案技能。
+1. **`aaaav-do`**（開發循環）：
+   - **Align（對齊）**：用使用者的話重述需求，將變更歸類為 **Inline**（範圍局部、需求明確）或 **Durable**（決策需要延續到這次執行之後）。
+   - **Advance（推進）**：Durable 任務依 `Decision → Spec → Design` 推進，收斂合約、介面邊界與決策。
+   - **Anchor（定錨）**：在第一筆 production 修改前，宣告 reality anchor 與 checkpoint。
+   - **Act（實作）**：依目標專案的原生慣例實作。每次嘗試錯誤後發現的事，都記成一筆摩擦記錄（`Tried` / `Found` / `Led by`）；Durable 寫在 `design.md` 的 `## Friction Notes`，Inline 寫在 `scratch/friction.md`。
+   - **Verify（驗證）**：執行錨點，以 `Requirement | Evidence | Result` 表記錄觀察結果。**Reflexive（反思）** 將每筆摩擦記錄歸類為 **misdirection**（skill 或指令把嘗試帶錯方向）或 **gap**（沒有 skill 或指令涵蓋，只好繞路找答案）；沒有記錄就標記為 clean run。
+2. **`solid-loop`**（修正 agent 系統）：
+   - 套用已分類的摩擦記錄：修正誤導的那一行，或把缺少的事實放進唯一負責的位置。
+   - 防止 skill 膨脹：新增前先找是否已有相同陳述，對每個改過的段落做 no-op 檢查，並讓每個 `SKILL.md` 維持在 300 行以內。
+3. **`boot-loop`**（建立 agent 系統）：
+   - 派出數個獨立 worker，透過 `aaaav-do` 執行調查任務。
+   - 合併 worker 回傳的摩擦記錄，執行一次 `solid-loop`，建立或精煉 `AGENTS.md`、`CLAUDE.md` 與專案 skill。
 
 ## 用法
 
@@ -61,7 +57,7 @@ Alignment: 實作多租戶認證機制
 
 ### 3. 工作流與技能驗證
 
-執行驗證以確保技能與規則符合精簡與非防禦性標準：
+驗證 skill、規則與 Durable 產出物：
 
 ```bash
 # 執行工作區驗證與自動化測試套件

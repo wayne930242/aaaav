@@ -30,11 +30,11 @@ Approved from: <the user reply that approved it, empty while proposed>
 
 ## `design.md`
 
-Chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. This is the implementation-ready handoff -- a straightforward design may be short, but it still names precedent and seam. When major friction occurs during Act, append it under `## Friction Notes`.
+Chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. This is the implementation-ready handoff -- a straightforward design may be short, but it still names precedent and seam. Friction notes recorded during Act go under `## Friction Notes`.
 
 ## `verification.md`
 
-One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved gaps and their impact. Include a scoped Reflexive section reviewing used rules, `AGENTS.md` / `CLAUDE.md`, and skills: evaluate whether skills saved time/tokens or caused detours, guided by "What did I wish I knew earlier to reduce friction and detours?", invoking `solid-loop` to calibrate agent system assets. Keep local verification, commit, push, CI, deployment, and browser proof as separate claims.
+One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its `solid-loop` action, or `Reflexive: clean run.` Keep local verification, commit, push, CI, deployment, and browser proof as separate claims.
 
 ## Updates
 
