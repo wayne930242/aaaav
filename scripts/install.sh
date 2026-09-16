@@ -99,8 +99,10 @@ install_claude() {
         claude plugin marketplace remove weihung-loop-boot 2>/dev/null || true
         claude plugin uninstall aaaav-loop-boot@aaaav-loop-boot 2>/dev/null || true
         claude plugin marketplace remove aaaav-loop-boot 2>/dev/null || true
-        claude plugin marketplace add "$REPO_ROOT" 2>/dev/null || claude plugin marketplace update aaaav 2>/dev/null || true
-        claude plugin install aaaav@aaaav 2>/dev/null || claude plugin update aaaav@aaaav 2>/dev/null || true
+        claude plugin marketplace add "$REPO_ROOT" 2>/dev/null || true
+        claude plugin marketplace update aaaav 2>/dev/null || true
+        claude plugin install aaaav@aaaav 2>/dev/null || true
+        claude plugin update aaaav@aaaav 2>/dev/null || true
         echo "Claude Code plugin registered via claude CLI."
     else
         local claude_plugin_dir="$HOME/.claude/plugins/aaaav"

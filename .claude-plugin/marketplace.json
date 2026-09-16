@@ -4,13 +4,13 @@
     "name": "Wei Hung"
   },
   "metadata": {
-    "version": "0.4.1",
+    "version": "0.4.2",
     "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
   },
   "plugins": [
     {
       "name": "aaaav",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex",
       "source": "./"
     }
