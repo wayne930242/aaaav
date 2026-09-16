@@ -1,6 +1,6 @@
 [project]
 name = "aaaav"
-version = "0.4.0"
+version = "0.4.1"
 description = "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
 readme = "README.md"
 requires-python = ">=3.11"

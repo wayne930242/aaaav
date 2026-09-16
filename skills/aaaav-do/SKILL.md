@@ -53,7 +53,7 @@ Before the first production edit, state:
 
     Reality anchor: <the simplest credible contact with reality and its checkpoint>
 
-Choose it from the task, user, and target project. The method inside may use an executable check, user operation, human judgment, or focused review. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
+A dispatched run takes the anchor its coordinator assigned. A run with no coordinator chooses it from the task, user, and target project. The method inside may use an executable check, user operation, human judgment, or focused review. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
 
 ## Act
 
@@ -71,6 +71,8 @@ Each time an attempt fails and a later attempt reveals why (a command errors, a 
 Durable work appends notes under `## Friction Notes` in `design.md`; inline work appends them to `scratch/friction.md`.
 
 ## Verify
+
+A dispatched run hands its completed work and its verification request back to the coordinator that dispatched it. A run with no coordinator verifies here and dispatches its own verification agent when one is useful.
 
 ### 1. Evidence Verification
 
