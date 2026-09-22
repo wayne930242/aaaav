@@ -1,6 +1,6 @@
 {
   "name": "aaaav",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex. Standardizes skills, reporting, communication, trial-and-error friction notes, and reflexive reviews.",
   "author": {
     "name": "Wei Hung"

@@ -72,7 +72,7 @@ Durable work appends notes under `## Friction Notes` in `design.md`; inline work
 
 ## Verify
 
-A dispatched run hands its completed work and its verification request back to the coordinator that dispatched it. A run with no coordinator verifies here and dispatches its own verification agent when one is useful.
+A dispatched run verifies inside the anchor its coordinator assigned and hands back the completed work with that evidence. A run with no coordinator verifies here and dispatches its own verification agent when one is useful.
 
 ### 1. Evidence Verification
 
