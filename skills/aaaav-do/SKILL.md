@@ -15,10 +15,10 @@ Open every run with one working interpretation in the model's own words:
 
 Declare the change **Inline** or **Durable** before the first production edit:
 
-- **Inline:** Requirements are clear, impact is localized, implementation and verification fit this run, and the decisions have little future reuse. Inline work may change observable behavior and writes no artifact files.
-- **Durable:** A decision, constraint, or proof must outlive this run -- unconfirmed design, a public or external contract, a migration, cross-component coordination, continuity across a session or handoff, a user-requested spec, or an active related artifact.
+- **Inline:** The work is simple, requirements and approach are clear, impact is bounded, and implementation and verification fit this run. Confirm the approach in conversation and proceed under the user's existing authorization. A lasting behavior, public contract, or existing artifact can still be Inline when the change is simple; Inline requires no spec or new artifact files.
+- **Durable:** The work needs a persistent design record because of material ambiguity, consequential trade-offs, complex cross-component coordination, migration risk, or continuity across sessions. A user-requested spec also follows Durable.
 
-Escalate to durable when the request carries material ambiguity, spans modules or sessions, sets a lasting contract, is high risk, expands scope, or requests a spec first.
+Choose by the work's complexity and need for a written design, rather than how long its outcome lasts. When simple work was classified Durable, reclassify it Inline once the approach is settled and continue from the evidence already gathered.
 
 Inline work follows Alignment with these two lines. They are required output:
 

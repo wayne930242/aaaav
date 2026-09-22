@@ -17,5 +17,5 @@ This repository defines a streamlined, multi-platform AAAAV plugin for Antigravi
 
 ## Development Workflow
 
-- Run `python3 hooks/validate_all.py .` to ensure skills and rules conform to the compactness and quality baselines.
-- Run `python3 -m unittest discover -s tests` before declaring verification complete.
+- Run `uv run python hooks/validate_all.py .` to ensure skills and rules conform to the compactness and quality baselines.
+- Run `uv run python -m unittest discover -s tests` before declaring verification complete.
