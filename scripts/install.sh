@@ -111,17 +111,33 @@ install_claude() {
 }
 
 # 3. Codex installation
+# Codex loads aaaav skills from the installed aaaav@aaaav plugin cache, so this
+# installer no longer symlinks skills into the deprecated ~/.codex/skills
+# compatibility location. On machines where an earlier version of this
+# installer created those symlinks, remove them so each skill is listed once.
+cleanup_stale_codex_links() {
+    local codex_skills_dir="$1"
+    [ -d "$codex_skills_dir" ] || return 0
+
+    local entry target
+    while IFS= read -r -d '' entry; do
+        target="$(readlink "$entry")"
+        case "$target" in
+            "$REPO_ROOT"/*)
+                if [ "$DRY_RUN" = true ]; then
+                    echo "[DRY RUN] Would remove stale Codex skill link: $entry -> $target"
+                else
+                    rm -f "$entry"
+                    echo "Removed stale Codex skill link: $entry -> $target"
+                fi
+                ;;
+        esac
+    done < <(find "$codex_skills_dir" -maxdepth 1 -type l -print0)
+}
+
 install_codex() {
     echo "=== Installing for Codex ==="
-    local codex_skills_dir="$HOME/.codex/skills"
-    mkdir -p "$codex_skills_dir"
-    for skill_path in "$REPO_ROOT"/skills/*; do
-        if [ -d "$skill_path" ]; then
-            local skill_name
-            skill_name="$(basename "$skill_path")"
-            link_target "$skill_path" "$codex_skills_dir/$skill_name"
-        fi
-    done
+    cleanup_stale_codex_links "$HOME/.codex/skills"
 }
 
 case "$TARGET" in

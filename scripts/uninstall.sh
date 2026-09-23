@@ -84,16 +84,32 @@ uninstall_claude() {
     remove_target "$HOME/.claude/plugins/weihung-loop-boot"
 }
 
+# Codex loads aaaav skills from the installed aaaav@aaaav plugin cache, not
+# from ~/.codex/skills. Remove any symlink there whose target lies inside this
+# repo, whether left by an earlier installer version or the current one.
+cleanup_stale_codex_links() {
+    local codex_skills_dir="$1"
+    [ -d "$codex_skills_dir" ] || return 0
+
+    local entry target
+    while IFS= read -r -d '' entry; do
+        target="$(readlink "$entry")"
+        case "$target" in
+            "$REPO_ROOT"/*)
+                if [ "$DRY_RUN" = true ]; then
+                    echo "[DRY RUN] Would remove stale Codex skill link: $entry -> $target"
+                else
+                    rm -f "$entry"
+                    echo "Removed stale Codex skill link: $entry -> $target"
+                fi
+                ;;
+        esac
+    done < <(find "$codex_skills_dir" -maxdepth 1 -type l -print0)
+}
+
 uninstall_codex() {
     echo "=== Uninstalling from Codex ==="
-    local codex_skills_dir="$HOME/.codex/skills"
-    for skill_path in "$REPO_ROOT"/skills/*; do
-        if [ -d "$skill_path" ]; then
-            local skill_name
-            skill_name="$(basename "$skill_path")"
-            remove_target "$codex_skills_dir/$skill_name"
-        fi
-    done
+    cleanup_stale_codex_links "$HOME/.codex/skills"
 }
 
 case "$TARGET" in
