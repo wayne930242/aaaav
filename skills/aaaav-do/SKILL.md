@@ -51,9 +51,9 @@ Choose the smallest approach that fits the confirmed contract and architecture. 
 
 Before the first production edit, state:
 
-    Reality anchor: <the simplest credible contact with reality and its checkpoint>
+    Reality anchor: <the exact check that observes the changed behavior, and its checkpoint>
 
-A dispatched run takes the anchor its coordinator assigned. A run with no coordinator chooses it from the task, user, and target project. The method inside may use an executable check, user operation, human judgment, or focused review. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
+Point the anchor at what the change touches: the specific test, command, interface, or reviewer that observes the changed behavior, sized to the change's actual reach. A one-line instruction edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. A dispatched run takes the anchor its coordinator assigned. A run with no coordinator chooses it from the task, user, and target project. The method inside may use an executable check, user operation, human judgment, or focused review. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
 
 ## Act
 
