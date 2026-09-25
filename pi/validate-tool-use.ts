@@ -12,7 +12,11 @@ const HOOK_SCRIPT = fileURLToPath(new URL("../hooks/validate_tool_use.py", impor
 function validate(filePath: string, cwd: string): string | undefined {
 	const payload = JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath }, cwd });
 	const proc = spawnSync("python3", [HOOK_SCRIPT], { input: payload, encoding: "utf-8", timeout: 15_000 });
-	if (proc.status !== 0 || !proc.stdout.trim()) return undefined;
+	if (proc.error || proc.status !== 0) {
+		const reason = proc.error?.message || proc.stderr.trim() || `exit ${proc.status}`;
+		return `⚠ [aaaav] Validator did not run: ${reason}`;
+	}
+	if (!proc.stdout.trim()) return undefined;
 	return JSON.parse(proc.stdout).hookSpecificOutput?.additionalContext;
 }
 
