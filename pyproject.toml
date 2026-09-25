@@ -1,14 +1,14 @@
 [project]
 name = "aaaav"
 version = "0.5.1"
-description = "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, and Codex"
+description = "Validators and tests for the AAAAV pi package"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Wei Hung" }
 ]
 license = { text = "MIT" }
-keywords = ["aaaav", "agent-workflow", "streamlined-skills", "antigravity", "claude-code", "codex"]
+keywords = ["aaaav", "agent-workflow", "streamlined-skills", "pi-package"]
 
 
 [tool.pytest.ini_options]

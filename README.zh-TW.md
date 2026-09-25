@@ -1,6 +1,11 @@
 # aaaav
 
-精簡化的 AAAAV Agent 工作流程插件，支援 Antigravity、Claude Code 與 Codex。
+精簡化的 AAAAV Agent 工作流程套件，供 [pi](https://github.com/earendil-works/pi) 使用。
+
+本套件提供：
+
+- **工作流程 skill**：位於 `skills/`，由 pi 以套件 skill 載入。
+- **驗證 extension** `pi/validate-tool-use.ts`：每次 `write` 或 `edit` 成功後，對被修改的檔案執行 `hooks/validate_tool_use.py`，並把建議附加在模型讀到的 tool result 後面。檢查範圍包含 `SKILL.md`、指令檔（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`rules/`）以及 `docs/specs/` 下的 Durable 產出物。此 extension 需要 `PATH` 上有 `python3`；驗證器無法執行時，tool result 會註明原因。
 
 ## 概念
 
@@ -17,29 +22,43 @@ AAAAV 為 agent 提供一套簡短、可重複的工作流程，由三個 skill 
    - 防止 skill 膨脹：新增前先找是否已有相同陳述，對每個改過的段落做 no-op 檢查，並讓每個 `SKILL.md` 維持在 300 行以內。
 3. **`boot-loop`**（建立 agent 系統）：
    - 派出數個獨立 worker，透過 `aaaav-do` 執行調查任務。
-   - 合併 worker 回傳的摩擦記錄，執行一次 `solid-loop`，建立或精煉 `AGENTS.md`、`CLAUDE.md` 與專案 skill。
+   - 合併 worker 回傳的摩擦記錄，執行一次 `solid-loop`，建立或精煉 `AGENTS.md` 與專案 skill。
+
+## Skill 一覽
+
+| Skill | 使用時機 |
+| --- | --- |
+| `aaaav-do` | 執行有範圍、需求模糊或多步驟的程式碼修改。 |
+| `solid-loop` | 把摩擦記錄套用到 agent skill 與指令，或檢查 skill 是否膨脹。 |
+| `boot-loop` | 以調查型 tracer 任務建立或翻修 agent 系統，最後合併執行一次 `solid-loop`。 |
+| `investigating` | 研究問題、診斷根因或蒐集證據。 |
+| `inspecting` | 稽核或審查特定目標、diff、commit 或 spec。 |
+| `assuring-quality` | 最終 QA、探索式驗證或發佈前檢查。 |
+| `human-feedback` | 評估使用者回饋或進行互動式 UI 驗證。 |
+| `grilling` | 釐清屬於使用者的決策或模糊的架構取捨。 |
+| `grill-me` | 使用者要求針對某個想法被追問。 |
+| `grill-with-docs` | 探討 Durable 決策、領域術語或 ADR。 |
+| `codebase-design` | 設計或修改模組介面與邊界。 |
+| `domain-modeling` | 精煉專案術語或領域邊界。 |
+| `prototype` | 以可丟棄的程式碼解答架構問題或驗證假設。 |
 
 ## 用法
 
 ### 1. 安裝方式
 
-一鍵安裝至 Antigravity、Claude Code 與 Codex：
+從 GitHub 安裝：
 
 ```bash
-# 同步安裝至所有支援平台
-bash scripts/install.sh --target all
-
-# 或安裝至指定平台
-bash scripts/install.sh --target agy
-bash scripts/install.sh --target claude
-bash scripts/install.sh --target codex
+pi install git:github.com/wayne930242/aaaav
 ```
 
-以本機 package 安裝至 pi（包含所有 skill，以及在 `write`、`edit` 後附上驗證建議的 `tool_result` extension）：
+或安裝本機 checkout；pi 會直接從該路徑載入、不複製，修改在下一個 session 生效：
 
 ```bash
 pi install /path/to/aaaav
 ```
+
+加上 `-l` 會寫入目前專案的 `.pi/settings.json`，而非使用者設定。移除時執行 `pi remove <相同 source>`。
 
 ### 2. 呼叫開發循環 (`aaaav-do`)
 
@@ -66,6 +85,9 @@ Alignment: 實作多租戶認證機制
 驗證 skill、規則與 Durable 產出物：
 
 ```bash
-# 執行工作區驗證與自動化測試套件
+# 執行工作區驗證與 unittest 測試套件
 bash scripts/validate.sh
+
+# 或執行完整測試套件，包含 pi extension 測試（需要 node）
+uv run --with pytest pytest -q
 ```

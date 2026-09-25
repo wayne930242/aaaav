@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PostToolUse hook entrypoint for Antigravity, Claude Code, and Codex.
+"""Validator entrypoint called by the pi extension in pi/validate-tool-use.ts.
 
-Validates edited files against skill compactness, direct expected behavior,
-and durable review standards without interrupting execution.
+Reads {"tool_input": {"file_path": ...}, "cwd": ...} on stdin, validates the
+edited file against skill compactness, direct expected behavior, and durable
+review standards, and prints {"additionalContext": ...} when it has advice.
 """
 
 import json
@@ -54,16 +55,10 @@ def main() -> None:
     try:
         file_path_str = extract_file_path_from_payload(data)
         if not file_path_str:
-            # Check if payload was just Antigravity or Claude with no file
-            is_claude = "tool_input" in data
-            print(json.dumps({}) if not is_claude else json.dumps({}))
+            print(json.dumps({}))
             sys.exit(0)
 
-        # Resolve path
         cwd_str = data.get("cwd", "")
-        if not cwd_str and "workspacePaths" in data and data["workspacePaths"]:
-            cwd_str = data["workspacePaths"][0]
-
         cwd = Path(cwd_str) if cwd_str else Path.cwd()
         target_path = Path(file_path_str)
         if not target_path.is_absolute():
@@ -74,8 +69,6 @@ def main() -> None:
             sys.exit(0)
 
         warnings = run_validation(target_path)
-        is_claude = "tool_input" in data
-
         if warnings:
             try:
                 rel = target_path.relative_to(cwd)
@@ -84,20 +77,7 @@ def main() -> None:
 
             lines = "\n".join(f"  - {w}" for w in warnings)
             msg = f"⚠ [aaaav] Validation suggestions for {rel}:\n{lines}"
-
-            if is_claude:
-                output = {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PostToolUse",
-                        "additionalContext": msg,
-                    },
-                    "systemMessage": msg,
-                }
-                print(json.dumps(output))
-            else:
-                # Antigravity expects {} on stdout
-                sys.stderr.write(msg + "\n")
-                print(json.dumps({}))
+            print(json.dumps({"additionalContext": msg}))
         else:
             print(json.dumps({}))
 

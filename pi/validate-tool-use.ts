@@ -17,7 +17,7 @@ function validate(filePath: string, cwd: string): string | undefined {
 		return `⚠ [aaaav] Validator did not run: ${reason}`;
 	}
 	if (!proc.stdout.trim()) return undefined;
-	return JSON.parse(proc.stdout).hookSpecificOutput?.additionalContext;
+	return JSON.parse(proc.stdout).additionalContext;
 }
 
 export default function (pi: ExtensionAPI) {

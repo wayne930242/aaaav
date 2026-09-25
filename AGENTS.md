@@ -1,6 +1,6 @@
 # Agent Working Agreements: aaaav
 
-This repository defines a streamlined, multi-platform AAAAV plugin for Antigravity, Claude Code, and Codex.
+This repository is the AAAAV pi package: the workflow skills in `skills/` and the pi extension `pi/validate-tool-use.ts`, which runs `hooks/validate_tool_use.py` after `write` and `edit`.
 
 ## Core Directives
 
@@ -13,9 +13,9 @@ This repository defines a streamlined, multi-platform AAAAV plugin for Antigravi
 
 ## Versioning & Release Directives
 
-- Synchronize and bump the plugin version across all manifest files (`plugin.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.codex-plugin/plugin.json`, and `pyproject.toml`) whenever plugin capabilities, workflow contracts, or configurations change.
+- Bump the version in `package.json` and `pyproject.toml` together whenever package capabilities, workflow contracts, or configurations change.
 
 ## Development Workflow
 
 - Run `uv run python hooks/validate_all.py .` to ensure skills and rules conform to the compactness and quality baselines.
-- Run `uv run python -m unittest discover -s tests` before declaring verification complete.
+- Run `uv run --with pytest pytest -q` before declaring verification complete; `tests/test_pi_extension.py` loads the pi extension with Node.

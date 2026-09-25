@@ -1,1 +1,1 @@
-"""AAAAV plugin validators package."""
+"""AAAAV validators package."""

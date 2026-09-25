@@ -60,21 +60,8 @@ def find_defensive_phrases(text: str, patterns: list[str]) -> list[str]:
 
 
 def extract_file_path_from_payload(payload: dict) -> str | None:
-    """Extract edited file path from Claude or Antigravity tool payloads."""
-    # 1. Claude Code payload: data.get("tool_input", {}).get("file_path")
+    """Extract the edited file path from the pi extension payload's tool_input.file_path."""
     tool_input = payload.get("tool_input", {})
-    if isinstance(tool_input, dict):
-        for key in ["file_path", "path", "filePath", "TargetFile"]:
-            if tool_input.get(key):
-                return str(tool_input[key])
-
-    # 2. Antigravity payload: data.get("toolCall", {}).get("args", {})
-    tool_call = payload.get("toolCall", {})
-    if isinstance(tool_call, dict):
-        args = tool_call.get("args", {})
-        if isinstance(args, dict):
-            for key in ["TargetFile", "path", "file_path", "filePath", "AbsolutePath"]:
-                if args.get(key):
-                    return str(args[key])
-
+    if isinstance(tool_input, dict) and tool_input.get("file_path"):
+        return str(tool_input["file_path"])
     return None
