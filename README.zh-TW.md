@@ -35,6 +35,12 @@ bash scripts/install.sh --target claude
 bash scripts/install.sh --target codex
 ```
 
+以本機 package 安裝至 pi（包含所有 skill，以及在 `write`、`edit` 後附上驗證建議的 `tool_result` extension）：
+
+```bash
+pi install /path/to/aaaav
+```
+
 ### 2. 呼叫開發循環 (`aaaav-do`)
 
 任何涉及代碼修改的工作均透過 `aaaav-do` 驅動：

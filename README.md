@@ -35,6 +35,12 @@ bash scripts/install.sh --target claude
 bash scripts/install.sh --target codex
 ```
 
+Install into pi as a local package (skills plus a `tool_result` extension that appends validator suggestions after `write` and `edit`):
+
+```bash
+pi install /path/to/aaaav
+```
+
 ### 2. Invoking the Development Loop
 
 Trigger `aaaav-do` for any source-changing task:

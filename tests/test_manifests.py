@@ -45,6 +45,14 @@ class TestPluginManifests(unittest.TestCase):
         self.assertEqual(market_data["metadata"]["version"], version)
         self.assertEqual(market_data["plugins"][0]["version"], version)
         self.assertEqual(codex_data["version"], version)
+        pi_data = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(pi_data["version"], version)
+
+    def test_pi_manifest(self):
+        data = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["name"], "aaaav")
+        for path in data["pi"]["extensions"] + data["pi"]["skills"]:
+            self.assertTrue((REPO_ROOT / path).exists(), f"pi resource {path} must exist")
 
     def test_hooks_configuration(self):
         agy_hooks = REPO_ROOT / "hooks.json"

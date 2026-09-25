@@ -1,0 +1,17 @@
+{
+  "name": "aaaav",
+  "version": "0.5.0",
+  "description": "Streamlined AAAAV agent workflow plugin for Antigravity, Claude Code, Codex, and pi.",
+  "author": "Wei Hung",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "keywords": ["pi-package", "aaaav", "agent-workflow"],
+  "pi": {
+    "extensions": ["./pi/validate-tool-use.ts"],
+    "skills": ["./skills"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
