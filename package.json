@@ -1,6 +1,6 @@
 {
   "name": "aaaav",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Streamlined AAAAV agent workflow package for pi: workflow skills plus a validator extension.",
   "author": "Wei Hung",
   "license": "MIT",

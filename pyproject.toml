@@ -1,6 +1,6 @@
 [project]
 name = "aaaav"
-version = "0.5.1"
+version = "0.6.0"
 description = "Validators and tests for the AAAAV pi package"
 readme = "README.md"
 requires-python = ">=3.11"
