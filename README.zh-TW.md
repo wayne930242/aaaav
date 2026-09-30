@@ -29,7 +29,7 @@ AAAAV 為 agent 提供一套簡短、可重複的工作流程，由三個 skill 
 | Skill | 使用時機 |
 | --- | --- |
 | `aaaav-do` | 執行有範圍、需求模糊或多步驟的程式碼修改。 |
-| `solid-loop` | 把摩擦記錄套用到 agent skill 與指令，或檢查 skill 是否膨脹。 |
+| `solid-loop` | 撰寫、修改或檢查 agent skill 與指令，包含套用摩擦記錄。 |
 | `boot-loop` | 以調查型 tracer 任務建立或翻修 agent 系統，最後合併執行一次 `solid-loop`。 |
 | `investigating` | 研究問題、診斷根因或蒐集證據。 |
 | `inspecting` | 稽核或審查特定目標、diff、commit 或 spec。 |

@@ -1,13 +1,13 @@
 ---
 name: solid-loop
-description: Use when applying friction notes to agent skills and instructions, or when auditing a skill for sprawl.
+description: Use when writing, editing, or auditing agent skills and instructions, including applying friction notes.
 ---
 
 # Solid Loop
 
-Correct the agent system from friction notes while keeping every skill as small as the fix allows.
+Correct the agent system from friction notes, or edit it directly, while keeping every skill as small as the fix allows.
 
-The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read.
+The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read. Name problems with the `writing-great-skills` vocabulary: duplication, sediment, sprawl, no-op, negation, premature completion.
 
 ## Apply Friction Notes
 
@@ -19,13 +19,13 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
    - When none exists, write the fact as one direct sentence in its owning location: project facts in `AGENTS.md` or `CLAUDE.md`, procedure in the skill that ran the step.
    - Scaffold a new skill from [references/template-skill.md](references/template-skill.md) only when the gap is a multi-step procedure that no skill owns.
    - A fact the change itself resolved, or a general tool-use slip that no project or skill owns, needs no placement.
-3. **Hold the size.** Run the no-op test on every section you edited and delete each sentence that fails. Keep each `SKILL.md` under 300 lines; disclose reference into `references/` when it grows past that.
+3. **Hold the size.** Merge each fix into the sentence that already owns it. When a fix exposes one fact stated in several places, keep one authoritative statement and replace the rest with a pointer or delete them. Run the no-op test on every section you edited and delete each sentence that fails. Keep each `SKILL.md` under 300 lines; disclose reference into `references/` when it grows past that.
 
-**Complete when:** every note has an action or is marked resolved by the change, and every edited section has passed the no-op test.
+**Complete when:** every note has an action or is marked resolved by the change, every edited section has passed the no-op test, and no edited file is longer than before unless the addition is a multi-step procedure no skill owns.
 
-## Audit for Sprawl
+## Edit or Audit Directly
 
-Without friction notes, audit the named skill with the craft levers below, then run step 3.
+Without friction notes, apply the craft levers below to the target skill or instruction, then run step 3.
 
 ## Craft Levers
 
