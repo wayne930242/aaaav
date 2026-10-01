@@ -28,25 +28,32 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
 
 ## Create or Edit Directly
 
-1. **Create from the template.** Start a new skill from [references/template-skill.md](references/template-skill.md), keeping only the sections its work needs.
-2. **Apply the craft levers** below to the new or target skill or instruction.
-3. **Hold the size.** Run the no-op test on every sentence you wrote or edited, delete each that fails, and keep each `SKILL.md` under 300 lines by disclosing reference into `references/`.
+1. **Choose the layer.** Name what the skill changes: knowledge (what the model lacks), prohibition (a habit to block), process (an order), taste (an aesthetic), or discipline (shortcuts and false claims).
+   The layer sets the length, the tone, and how much the description must carry.
+2. **Run bare first.** For a new skill, have the model attempt the task without it and record where it fails; the first version covers those failures and nothing more.
+3. **Create from the template.** Start a new skill from [references/template-skill.md](references/template-skill.md), keeping only the sections its work needs.
+4. **Apply the craft levers** below to the new or target skill or instruction.
+5. **Hold the size.** Run the no-op test on every sentence you wrote or edited, delete each that fails, and keep each `SKILL.md` under 300 lines by disclosing reference into `references/`.
 
-**Complete when:** the description names each branch once, every step ends on a checkable criterion, every edited section has passed the no-op test, and each operational contract has one home.
+**Complete when:** the layer is named, a new skill covers its recorded bare-run failures, the description names each branch once, every step ends on a checkable criterion, every red line cites its observed failure, every edited section has passed the no-op test, and each operational contract has one home.
 
 ## Craft Levers
 
 - **Information hierarchy**: Put ordered actions in `SKILL.md` as steps, co-located rules in `SKILL.md` as reference, and templates or deep catalogs in `references/` behind explicit context pointers.
 - **Leading words**: Anchor behavior with compact pretrained concepts (*tight*, *red*, *tracer*, *reality anchor*) instead of spelled-out explanations.
+- **Description as hook**: Write the situation in the user's own words that should send them here, assertively, because models under-trigger.
 - **Completion criteria**: Make each criterion checkable, and demanding enough to drive thorough legwork.
+- **Explain why**: Put the consequence beside the rule, and reserve capitals and absolutes for the one rule that causes real damage, stated once.
+- **Script the deterministic**: Move fixed-step, single-answer work into a script and leave `SKILL.md` the judgment calls.
+- **Name the shortcut**: List the excuses the model will reach for as excuse → reality pairs, and turn adjectives into self-test questions.
 - **No-op test**: Evaluate each sentence in isolation and delete the ones that do not change behavior relative to the model's default.
 - **Single source of truth**: Give each operational contract one canonical home.
-- **Positive steering**: State the target behavior, because a prohibition names the unwanted pattern and makes it more likely.
+- **Positive steering**: State the target behavior, because a prohibition names the unwanted pattern and makes it more likely; a prohibition or discipline skill keeps a negation only as an earned red line.
+- **Earn the red line**: Admit a red line only when an observed failure backs it (a friction note's `Found` or a bare-run failure) and its reason or excuse → reality pair rides with it; delete the rest. The validator flags red-line inflation as an advisory.
 
 | Prohibition | Expected behavior |
 | --- | --- |
 | "Forbidden to edit files without prior consent" | "State the contract and authorization before editing production code." |
-| "Avoid making assumptions or guessing answers" | "Resolve uncertainty from project sources; ask only for genuine user-owned decisions." |
 
 ## Output Contract
 
