@@ -1,11 +1,12 @@
 # Streamlined Skill Template
 
 Use this template as a starting point when creating new skills.
+Keep the sections the skill's work needs and drop the rest.
 
 ```markdown
 ---
 name: <skill-name-gerund-or-action>
-description: Use when <trigger conditions and intended outcome>.
+description: Use when <one trigger per branch>.
 ---
 
 # <Skill Name>
@@ -18,19 +19,8 @@ description: Use when <trigger conditions and intended outcome>.
    - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
 2. **<Step 2 Name>**: <Direct statement of action and expected behavior.>
    - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
-3. **<Step 3 Name>**: <Direct statement of action and expected behavior.>
-   - **Completion Criterion**: <Observable, checkable condition confirming step is done.>
-
-## Verification
-
-Exercise the reality anchor and report results in standard format:
-
-| Requirement | Evidence | Result |
-|---|---|---|
-| <contract requirement> | <observed evidence> | pass / fail / unknown |
 
 ## References
 
-Disclosed secondary references and situational branches:
 - [Reference Name](references/<reference-file>.md)
 ```

@@ -29,7 +29,7 @@ AAAAV gives an agent a short, repeatable workflow built on three skills:
 | Skill | Use it when |
 | --- | --- |
 | `aaaav-do` | Executing scoped, ambiguous, or multi-step source-changing work. |
-| `solid-loop` | Writing, editing, or auditing agent skills and instructions, including applying friction notes. |
+| `solid-loop` | Creating, editing, or auditing agent skills and instructions, or applying friction notes. |
 | `boot-loop` | Bootstrapping or overhauling an agent system with investigative tracer jobs and one consolidated `solid-loop` pass. |
 | `investigating` | Researching questions, diagnosing root causes, or gathering evidence. |
 | `inspecting` | Auditing or reviewing a specific target, diff, commit, or spec. |
