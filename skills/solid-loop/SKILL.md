@@ -8,7 +8,7 @@ description: Use when creating, editing, or auditing agent skills and instructio
 Correct the agent system from friction notes, or create and edit it directly, while keeping every skill as small as the fix allows.
 
 The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read.
-Read `writing-great-skills` for the vocabulary that names problems: duplication, sediment, sprawl, no-op, negation, premature completion.
+Remove duplication (one meaning in several places), sediment (stale layers), sprawl (length beyond use), no-op lines, and negation; prevent premature completion with checkable criteria.
 
 ## Apply Friction Notes
 
