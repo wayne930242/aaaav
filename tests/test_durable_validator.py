@@ -3,6 +3,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+
 from hooks.validators.durable_validator import (
     check_decision_md,
     check_spec_md,

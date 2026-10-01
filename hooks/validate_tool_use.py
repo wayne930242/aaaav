@@ -10,15 +10,10 @@ import json
 import sys
 from pathlib import Path
 
-# Add script directory to path for relative imports
-script_dir = Path(__file__).resolve().parent
-if str(script_dir) not in sys.path:
-    sys.path.insert(0, str(script_dir))
-
-from validators.utils import extract_file_path_from_payload
-from validators.skill_validator import check_skill_md
-from validators.rule_validator import check_rules_file
 from validators.durable_validator import check_durable_spec
+from validators.rule_validator import check_rules_file
+from validators.skill_validator import check_skill_advisories, check_skill_md
+from validators.utils import extract_file_path_from_payload
 
 
 def run_validation(path: Path) -> list[str]:
@@ -30,6 +25,7 @@ def run_validation(path: Path) -> list[str]:
     # 1. SKILL.md
     if name == "skill.md":
         warnings.extend(check_skill_md(path))
+        warnings.extend(check_skill_advisories(path))
 
     # 2. Rule and instruction files
     elif name in ("agents.md", "claude.md", "gemini.md") or "/rules/" in path_str:

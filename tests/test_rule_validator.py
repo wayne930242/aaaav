@@ -3,6 +3,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+
 from hooks.validators.rule_validator import check_rules_file
 
 

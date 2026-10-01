@@ -1,7 +1,7 @@
 """Validator for rule and instruction files (AGENTS.md, CLAUDE.md, rules/*.md, rules/*.rules)."""
 
-import re
 from pathlib import Path
+
 from .constants import DEFENSIVE_PATTERNS
 from .utils import find_defensive_phrases
 

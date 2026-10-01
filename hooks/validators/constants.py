@@ -23,6 +23,18 @@ DEFENSIVE_PATTERNS = [
     r"絕對不可",
 ]
 
+# Red-line advisories: markers are counted against a budget of max(MIN_BUDGET, lines * DENSITY).
+# Existing skills peak at 0.067 markers per line, so the budget fires only on clear inflation.
+RED_LINE_MARKERS = (
+    r"\b(never|must not|do not|don't|forbidden|barred|prohibited|avoid)\b"
+    r"|不要|禁止|不得|不准|嚴禁"
+)
+RED_LINE_MIN_BUDGET = 3
+RED_LINE_DENSITY = 0.10
+# Emphatic capitals are matched case-sensitively and need a reason on the same or next line.
+EMPHATIC_WORDS = r"\b(NEVER|ALWAYS|MUST NOT|MUST|FORBIDDEN|DO NOT)\b"
+REASON_WORDS = r"\b(because|otherwise|so that|since)\b|否則|因為|以免"
+
 # Essential core rules to check during durable pre-flight
 CORE_RULES = [
     "Traditional Chinese communication",

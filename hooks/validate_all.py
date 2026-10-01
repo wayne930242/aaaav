@@ -5,14 +5,9 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add script directory to path
-script_dir = Path(__file__).resolve().parent
-if str(script_dir) not in sys.path:
-    sys.path.insert(0, str(script_dir))
-
-from validators.skill_validator import check_skill_md
-from validators.rule_validator import check_rules_file
 from validators.durable_validator import check_durable_spec
+from validators.rule_validator import check_rules_file
+from validators.skill_validator import check_skill_advisories, check_skill_md
 
 
 def scan_workspace(root: Path) -> dict[str, list[str]]:
@@ -58,6 +53,18 @@ def scan_workspace(root: Path) -> dict[str, list[str]]:
     return results
 
 
+def scan_advisories(root: Path) -> dict[str, list[str]]:
+    """Collect red-line advisories for SKILL.md files; they never affect the exit code."""
+    results: dict[str, list[str]] = {}
+    for skill_file in root.rglob("SKILL.md"):
+        if any(part.startswith(".") or part in ("venv", ".venv", "__pycache__") for part in skill_file.parts):
+            continue
+        advisories = check_skill_advisories(skill_file)
+        if advisories:
+            results[str(skill_file.relative_to(root))] = advisories
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate skills, rules, and durable specs.")
     parser.add_argument("path", nargs="?", default=".", help="Root directory to scan (defaults to current directory)")
@@ -66,6 +73,14 @@ def main() -> None:
     root = Path(args.path).resolve()
     print(f"Scanning workspace: {root}")
     results = scan_workspace(root)
+
+    advisories = scan_advisories(root)
+    if advisories:
+        print(f"\nAdvisories for {len(advisories)} file(s) (do not affect the exit code):")
+        for file_path, notes in advisories.items():
+            print(f"\n  [{file_path}]")
+            for note in notes:
+                print(f"    - {note}")
 
     if not results:
         print("✓ All skills, rules, and durable specs passed validation cleanly.")

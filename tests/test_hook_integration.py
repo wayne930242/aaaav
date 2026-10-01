@@ -63,6 +63,26 @@ class TestHookIntegration(unittest.TestCase):
         self.assertEqual(list(output), ["additionalContext"])
         self.assertIn("defensive wording", output["additionalContext"])
 
+    def test_skill_red_line_advisory_returns_additional_context(self):
+        skill_dir = self.base_path / "my-skill"
+        skill_dir.mkdir()
+        test_file = skill_dir / "SKILL.md"
+        test_file.write_text(
+            "---\nname: my-skill\ndescription: Use when executing streamlined tasks.\n---\nNEVER edit the lockfile.\n",
+            encoding="utf-8",
+        )
+
+        payload = {"tool_name": "Edit", "tool_input": {"file_path": str(test_file)}, "cwd": str(self.base_path)}
+        proc = subprocess.run(
+            ["python3", str(HOOK_SCRIPT)],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0)
+        output = json.loads(proc.stdout)
+        self.assertIn("emphatic 'NEVER' has no reason", output["additionalContext"])
+
     def test_empty_input_graceful_exit(self):
         proc = subprocess.run(
             ["python3", str(HOOK_SCRIPT)],

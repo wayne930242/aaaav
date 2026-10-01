@@ -1,7 +1,6 @@
 """Utility functions for validators."""
 
 import re
-from pathlib import Path
 
 
 def parse_frontmatter(text: str) -> dict[str, str] | None:
@@ -48,10 +47,15 @@ def extract_markdown_links(text: str) -> list[str]:
     return local_links
 
 
+def strip_code(text: str) -> str:
+    """Blank out fenced and inline code while keeping line numbers stable."""
+    stripped = re.sub(r"```[\s\S]*?```", lambda m: "\n" * m.group(0).count("\n"), text)
+    return re.sub(r"`[^`\n]+`", "", stripped)
+
+
 def find_defensive_phrases(text: str, patterns: list[str]) -> list[str]:
     """Find defensive phrasing anti-patterns outside code blocks."""
-    stripped = re.sub(r"```[\s\S]*?```", "", text)
-    stripped = re.sub(r"`[^`\n]+`", "", stripped)
+    stripped = strip_code(text)
     found: list[str] = []
     for pattern in patterns:
         if re.search(pattern, stripped, re.IGNORECASE):

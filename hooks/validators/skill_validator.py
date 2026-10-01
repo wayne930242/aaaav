@@ -1,15 +1,24 @@
 """Validator for SKILL.md files focusing on compactness and direct expected behavior."""
 
+import re
+from collections import Counter
 from pathlib import Path
+
 from .constants import (
+    DEFENSIVE_PATTERNS,
+    EMPHATIC_WORDS,
+    REASON_WORDS,
+    RED_LINE_DENSITY,
+    RED_LINE_MARKERS,
+    RED_LINE_MIN_BUDGET,
     SKILL_ALLOWED_FIELDS,
     SKILL_MAX_RECOMMENDED_LINES,
-    DEFENSIVE_PATTERNS,
 )
 from .utils import (
-    parse_frontmatter,
     extract_markdown_links,
     find_defensive_phrases,
+    parse_frontmatter,
+    strip_code,
 )
 
 
@@ -60,7 +69,7 @@ def check_skill_md(path: Path) -> list[str]:
             warnings.append(f"broken local link: {link}")
 
     # 4. Orphaned files check
-    linked_normalized = {str(Path(l)).replace("\\", "/") for l in local_links}
+    linked_normalized = {str(Path(link)).replace("\\", "/") for link in local_links}
     for f in skill_dir.rglob("*"):
         if f == path or f.is_dir():
             continue
@@ -79,3 +88,42 @@ def check_skill_md(path: Path) -> list[str]:
         )
 
     return warnings
+
+
+def check_skill_advisories(path: Path) -> list[str]:
+    """Red-line advisories for the author; they never count as validation failures."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return []
+
+    body = strip_code(text)
+    lines = body.splitlines()
+    advisories: list[str] = []
+
+    # 1. Budget: red lines are earned by an observed failure, so their count stays small.
+    markers = len(re.findall(RED_LINE_MARKERS, body, re.IGNORECASE))
+    budget = max(RED_LINE_MIN_BUDGET, int(sum(1 for line in lines if line.strip()) * RED_LINE_DENSITY))
+    if markers > budget:
+        advisories.append(
+            f"{markers} red-line markers exceed the budget of {budget}. Keep a red line only when an "
+            "observed failure backs it, and delete the rest."
+        )
+
+    # 2. Reasoned: an emphatic word carries its reason on the same or next line.
+    # 3. Once: an emphatic word is spent a single time.
+    seen: Counter[str] = Counter()
+    for number, line in enumerate(lines, start=1):
+        for word in re.findall(EMPHATIC_WORDS, line):
+            seen[word] += 1
+            window = " ".join(lines[number - 1 : number + 1])
+            if not re.search(REASON_WORDS, window, re.IGNORECASE):
+                advisories.append(
+                    f"line {number}: emphatic '{word}' has no reason beside it. "
+                    "State the consequence, or drop the emphasis."
+                )
+    for word, count in seen.items():
+        if count > 1:
+            advisories.append(f"emphatic '{word}' appears {count} times. Spend emphasis once, on the rule that causes real damage.")
+
+    return advisories

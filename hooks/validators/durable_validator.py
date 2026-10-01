@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+
 from .constants import DEFENSIVE_PATTERNS, VALID_VERIFICATION_RESULTS
 from .utils import find_defensive_phrases
 
