@@ -29,23 +29,7 @@ Approval already given is not requested again. Durable work reads [MINI-SDD.md](
 
 ## Advance
 
-Once a task is dispatched, this belongs to the worker and the user; a bounded loop you carry yourself runs it inline. For Durable work:
-
-### Decision
-
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Create `decision.md` for new work and resume a legacy artifact in place. Check that core rules are ready before implementation. Open decisions that block observable behavior are settled before proceeding.
-
-**Complete when:** no open decision blocks observable behavior.
-
-### Spec
-
-State the observable contract, edge cases, compatibility constraints, non-goals, and the applied project standards. Name the reality anchor and checkpoint. Persist the durable contract in `spec.md` under `Status: proposed` before presenting it, then await explicit user confirmation.
-
-`proposed` keeps production source untouched while artifacts and read-only work stay open. Only the user's approving reply sets `Status: approved`, `Approved at`, and `Approved from`. An inline `Contract:` is approved by its `Authorization:`.
-
-### Design
-
-Choose the smallest approach that fits the confirmed contract and architecture. Invoke `codebase-design` when interfaces or seams change, `prototype` when a named question is cheaper to settle by experiment, and the project's exact skill. Design is done when implementation invents no product behavior or architecture.
+Once a task is dispatched, this belongs to the worker and the user; a bounded loop you carry yourself runs it inline. An inline `Contract:` is approved by its `Authorization:` and skips Advance. Durable work runs Decision → Spec → Design as [MINI-SDD.md](MINI-SDD.md) describes, and Spec waits for the user's approval before any production edit.
 
 ## Anchor
 
@@ -76,19 +60,7 @@ A dispatched run verifies inside the anchor its coordinator assigned and hands b
 
 ### 1. Evidence Verification
 
-Exercise the chosen reality anchor and capture what it observed. For Inline work, a green anchor plus a read of your own diff completes verification; report the contract with its observed output in one line. Durable work also reviews the diff against project standards, the approved spec, and the confirmed domain model, dispatches a verification agent when the anchor needs an independent observer, and records the table below in `verification.md`. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
-
-#### Verification Table Format
-
-Give every requirement in the spec its own `Requirement | Evidence | Result` row:
-
-| Requirement | Evidence | Result |
-|---|---|---|
-| Observable behavior or contract from spec | Real interface executed and the specific output observed | pass / fail / unknown |
-
-- **pass**: The chosen reality anchor ran against the actual implementation and directly observed the expected behavior.
-- **fail**: The anchor executed and observed a deviation from the contract or an error.
-- **unknown**: The requirement was not directly exercised by an anchor in this run. A green test suite or passing unrelated check does not count as evidence for an unexercised requirement.
+Exercise the chosen reality anchor and capture what it observed. For Inline work, a green anchor plus a read of your own diff completes verification; report the contract with its observed output in one line. Durable work also reviews the diff against project standards, the approved spec, and the confirmed domain model, dispatches a verification agent when the anchor needs an independent observer, and records its table in `verification.md` as [MINI-SDD.md](MINI-SDD.md) describes. A requirement the anchor did not exercise is `unknown`; a green unrelated suite is not evidence for it. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
 
 Report local tests, builds, interactive runs, browser inspection, commit, push, CI, and deployment as separate claims; one never stands in for another.
 

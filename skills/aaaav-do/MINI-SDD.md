@@ -1,40 +1,62 @@
-# Durable artifact contract
+# Durable phases and artifacts
 
-Read this when work is classified as durable. The threshold itself lives in [SKILL.md](SKILL.md); this file only says what each file holds.
+Read this when work is classified as durable. The threshold itself lives in [SKILL.md](SKILL.md); this file holds the Durable phases and what each artifact contains.
 
 Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its phase is reached, not up front. Link to project instructions, ADRs, code, research, tickets, and visuals rather than copying them.
 
-## `decision.md`
+## Decision → `decision.md`
 
-Outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Confirm core rules readiness before implementation. Explore every consequential branch in:
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Check that core rules are ready before implementation.
 
-```
+The file holds outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Explore every consequential branch in:
+
+```markdown
 | Question | Answer | Basis | Status |
 |---|---|---|---|
 | ... | ... | request, evidence, or decision link | grounded, confirmed, or open |
 ```
 
-Status is `grounded`, `confirmed`, or `open`. `grounded` comes from the request, source facts, or existing decisions; `confirmed` comes from the user; `open` is a consequential user-owned decision. Open rows are empty before `spec.md`.
+Status is `grounded`, `confirmed`, or `open`. `grounded` comes from the request, source facts, or existing decisions; `confirmed` comes from the user; `open` is a consequential user-owned decision.
 
 A folder that already contains `requirements.md` continues using it as its decision artifact. New folders create `decision.md`.
 
-## `spec.md`
+**Complete when:** no open row blocks observable behavior.
 
-Opens with the approval header, then observable behavior and edge cases; compatibility constraints and non-goals; applied standards with their impact; evidence and precedent links; the selected reality anchor and checkpoint.
+## Spec → `spec.md`
 
-```
+State the observable contract, edge cases, compatibility constraints, non-goals, and the applied project standards. Persist it in `spec.md` under `Status: proposed` before presenting it, then await explicit user confirmation. `proposed` keeps production source untouched while artifacts and read-only work stay open. Only the user's approving reply sets `Status: approved`, `Approved at`, and `Approved from`.
+
+The file opens with the approval header, then observable behavior and edge cases; compatibility constraints and non-goals; applied standards with their impact; evidence and precedent links; the selected reality anchor and checkpoint.
+
+```markdown
 Status: proposed | approved
 Approved at: <date the user approved, empty while proposed>
 Approved from: <the user reply that approved it, empty while proposed>
 ```
 
-## `design.md`
+## Design → `design.md`
 
-Chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. This is the implementation-ready handoff -- a straightforward design may be short, but it still names precedent and seam. Friction notes recorded during Act go under `## Friction Notes`.
+Choose the smallest approach that fits the approved spec and architecture. Invoke `codebase-design` when interfaces or seams change, `prototype` when a named question is cheaper to settle by experiment, and the project's exact skill.
 
-## `verification.md`
+The file holds the chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. A straightforward design may be short, but it still names precedent and seam. Friction notes recorded during Act go under `## Friction Notes`.
 
-One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its `solid-loop` action, or `Reflexive: clean run.`
+**Complete when:** implementation invents no product behavior or architecture.
+
+## Verify → `verification.md`
+
+Give every requirement in `spec.md` its own row:
+
+```markdown
+| Requirement | Evidence | Result |
+|---|---|---|
+| Observable behavior from spec | Real interface executed and the specific output observed | pass / fail / unknown |
+```
+
+- **pass**: The reality anchor ran against the actual implementation and directly observed the expected behavior.
+- **fail**: The anchor executed and observed a deviation from the spec or an error.
+- **unknown**: No anchor exercised the requirement in this run.
+
+Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its action, or `Reflexive: clean run.`
 
 ## Updates
 
