@@ -73,21 +73,11 @@ input.
 ## 4. Hand off
 
 Return the confirmed chain to `aaaav-do` as decision input for the
-source-changing fix. It classifies artifact depth itself: a localized correction
-runs inline there, and only durable decisions produce artifacts. Handing the
-chain over is what keeps it from being re-derived, not a checkpoint the fix has
-to clear.
+source-changing fix.
 
 **Complete when:** no change was requested, or `aaaav-do` has received a
 confirmed correction target.
 
 ## 5. Reflexive System Placement
 
-When human feedback conveys a design choice, architectural taste, or personal preference rather than an isolated code bug, hold a reflection point to place this single consideration into the correct location within the agent system:
-
-1. **Isolate the Single Consideration**: Extract the exact preference or convention the person expressed without expanding into unrequested rules.
-2. **Identify the Native Destination**:
-   - **Personal or Interaction Preference**: Place in user-level rules, `model-preference-profile.md`, or session guidance.
-   - **Project Design or Architectural Convention**: Place directly into `AGENTS.md` or `CLAUDE.md`.
-   - **Procedural Workflow**: Tune or prune the specific skill involved.
-3. **Integrate Directly**: State the expected behavior positively and concisely in that single authoritative location. Avoid duplicate copies or defensive restrictions.
+When feedback conveys a preference or convention rather than an isolated code bug, hand the preference to `reflecting-to-root` and any procedure change to `solid-loop`.

@@ -3,7 +3,7 @@
 Use this branch when the requested source change fixes broken, failing, slow, or
 intermittent behavior.
 
-## Before specification
+## Before diagnosis
 
 1. Build one tight, agent-runnable feedback loop that asserts the user's exact
    symptom. Prefer a failing test, request script, CLI fixture, browser check,
@@ -29,7 +29,7 @@ narrow evidence or access needed. Do not theorize from code alone.
 
 ## Verification
 
-- Re-run the original feedback loop, the regression test, and the affected suite.
+- Run the regression test and the affected suite.
 - Remove every tagged debug probe and throwaway artifact.
 - If three fix attempts fail against the same red loop, revisit the hypotheses or
    architecture before another attempt.

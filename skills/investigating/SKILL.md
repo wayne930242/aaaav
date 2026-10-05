@@ -7,8 +7,8 @@ description: Use when researching questions, diagnosing root causes, or gatherin
 
 1. Define the exact question and completion boundary.
 2. Gather relevant evidence:
-   - code: use codebase-memory graph tools first; use text search for prose,
-     configuration, and literals; check history when behavior changed over time
+   - code: use LSP (`read_symbol`) for symbols and ast-grep for structure; use text
+     search for prose, configuration, and literals; check history when behavior changed over time
    - external facts: current primary sources, official documentation, source
      code, specifications, or first-party APIs
    - runtime: reproducible commands, logs, errors, and test output

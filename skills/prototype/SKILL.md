@@ -5,8 +5,7 @@ description: Use when resolving an architectural question or hypothesis with dis
 
 # Prototype
 
-Produce disposable evidence within the Design phase of `aaaav-do`. A
-direct prototype request enters that lifecycle before source is changed.
+Produce disposable evidence within the Design phase of `aaaav-do`.
 
 ## 1. Frame
 
@@ -35,7 +34,7 @@ question without interpreting hidden state.
 ## 3. Capture the verdict
 
 Record the question, environment, evidence, verdict, and resulting decision in
-`design.md`. Remove the prototype after it has served its purpose unless the user
+the caller's artifact (`design.md`), or in the reply when there is none. Remove the prototype after it has served its purpose unless the user
 or project convention explicitly preserves it; never commit or publish it without
 the active delivery workflow's authorization.
 

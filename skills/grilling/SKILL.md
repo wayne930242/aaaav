@@ -19,7 +19,7 @@ Each answer reshapes the tree. Recompute the frontier before the next round. A q
 
 Finding facts is the agent's job. Use the environment and available tools; delegate independent fact-finding only when it materially saves time. The decisions are the user's: put each frontier question to them and wait.
 
-The session is complete when the frontier is empty and every branch has been visited. Act on the result only after the user confirms shared understanding. Return the confirmed answers and decisions to the caller; update its caller-provided decision artifact before returning.
+The session is complete when the frontier is empty and every branch has been visited. Write the answers into the caller-provided decision artifact, if any, and return the confirmed decisions to the caller.
 
 ---
 

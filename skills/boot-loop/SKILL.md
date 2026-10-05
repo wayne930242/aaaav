@@ -21,12 +21,12 @@ Select 2 to 4 distinct, high-impact investigation targets representing primary a
 
 Each job must have a concrete, falsifiable objective.
 
-### 2. Dispatch Independent Workers (`aaaav-do`)
+### 2. Dispatch Independent Workers (`investigating`)
 
 Dispatch isolated subagents or background workers for each target:
 
-- Each worker follows **`aaaav-do`** (Align → Advance → Anchor → Act → Verify).
-- Each worker records and classifies friction notes as `aaaav-do` defines them, then returns the classified notes instead of invoking `solid-loop`.
+- Each worker follows **`investigating`**.
+- Each worker records and classifies friction notes in the `aaaav-do` format, then returns the classified notes instead of invoking `solid-loop`.
 
 Wait for workers to complete their designated investigation runs.
 
@@ -40,7 +40,7 @@ Apply the merged notes through a single `solid-loop` pass.
 
 ### 5. Verify Agent System Integrity
 
-1. Run the workspace validator (`bash scripts/validate.sh` or `python3 hooks/validate_all.py .`) to ensure:
+1. Run the workspace validator (`uv run python hooks/validate_all.py .`) to ensure:
    - Frontmatter and trigger phrasing are valid.
    - All skill bodies remain under 300 lines with valid local links.
    - Expected behaviors are stated directly without defensive phrasing.

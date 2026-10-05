@@ -26,7 +26,7 @@ For each finding:
 1. Trace the symptom to a falsifiable root-cause hypothesis.
 2. Hand any source-changing fix to `aaaav-do` with the finding and repro
    as its decision input.
-3. Re-run the repro and affected suite after the fix.
+3. Take the anchor evidence `aaaav-do` returns as the re-check.
 4. Record the evidence or unresolved gap before moving to the next finding.
 
 Git commits are delivery evidence owned by the active workflow. Create or push

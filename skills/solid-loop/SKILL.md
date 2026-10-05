@@ -8,7 +8,6 @@ description: Use when creating, editing, or auditing agent skills and instructio
 Correct the agent system from friction notes, or create and edit it directly, while keeping every skill as small as the fix allows.
 
 The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read.
-Remove duplication (one meaning in several places), sediment (stale layers), sprawl (length beyond use), no-op lines, and negation; prevent premature completion with checkable criteria.
 
 ## Apply Friction Notes
 
@@ -35,7 +34,7 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
 4. **Apply the craft levers** below to the new or target skill or instruction.
 5. **Hold the size.** Run the no-op test on every sentence you wrote or edited, delete each that fails, and keep each `SKILL.md` under 300 lines by disclosing reference into `references/`.
 
-**Complete when:** the layer is named, a new skill covers its recorded bare-run failures, the description names each branch once, every step ends on a checkable criterion, every red line cites its observed failure, every edited section has passed the no-op test, and each operational contract has one home.
+**Complete when:** the layer is named, every edited section has passed the no-op test, and each operational contract has one home.
 
 ## Craft Levers
 
@@ -50,10 +49,6 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
 - **Single source of truth**: Give each operational contract one canonical home.
 - **Positive steering**: State the target behavior, because a prohibition names the unwanted pattern and makes it more likely; a prohibition or discipline skill keeps a negation only as an earned red line.
 - **Earn the red line**: Admit a red line only when an observed failure backs it (a friction note's `Found` or a bare-run failure) and its reason or excuse → reality pair rides with it; delete the rest. The validator flags red-line inflation as an advisory.
-
-| Prohibition | Expected behavior |
-| --- | --- |
-| "Forbidden to edit files without prior consent" | "State the contract and authorization before editing production code." |
 
 ## Output Contract
 

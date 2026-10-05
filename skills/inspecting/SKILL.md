@@ -7,6 +7,8 @@ description: Use when auditing or reviewing a specific target, diff, commit, or 
 
 Define the evidence needed, check it, and give each scoped item a verdict.
 
+When a reviewer role contract is present, it governs scope, evidence, and report format; add only the Standards and Spec axes.
+
 For a branch, pull request, worktree, or change-set review, read
 [DIFF-REVIEW.md](DIFF-REVIEW.md) first and use its fixed-point Standards/Spec
 branch.
@@ -19,7 +21,7 @@ Choose the lightest mode that can support a trustworthy conclusion:
 
 - **Focused:** one narrow target or claim. Inspect it directly.
 - **Standard:** several clear items. State a concise checklist, then proceed.
-- **High-risk or ambiguous:** security, production, destructive effects, or unclear boundaries. Present the plan and wait for confirmation.
+- **High-risk or ambiguous:** security, production, destructive effects, or unclear boundaries. Present the plan; wait for confirmation only in a review the user started directly.
 
 Include only dimensions relevant to the request: correctness, edge cases, architecture, security, performance, conventions, dependencies, and side effects.
 
@@ -45,8 +47,3 @@ Lead with the conclusion. Prioritize failures and recommended actions by impact.
 When another workflow supplies an artifact path, return verdicts to that phase's
 artifact rather than creating a separate report.
 
-## Principles
-
-- **Evidence decides the verdict.** Confidence does not replace proof.
-- **Scope is the completion criterion.** Finish when every scoped item has a verdict.
-- **Depth follows risk.** Ceremony that does not improve the conclusion is noise.

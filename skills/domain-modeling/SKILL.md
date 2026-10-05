@@ -5,9 +5,9 @@ description: Use when project terminology or domain boundaries need refinement.
 
 # Domain Modeling
 
-Actively reconcile the user's language, the project's glossary, and code. Direct
-source-changing requests enter `aaaav-do`; return confirmed terms and
-decisions to its Advance phase.
+Actively reconcile the user's language, the project's glossary, and code. Return
+confirmed terms and decisions to the caller's artifact, or in the reply when
+there is none.
 
 ## Discipline
 
@@ -21,9 +21,8 @@ decisions to its Advance phase.
 5. Record a confirmed term immediately in `CONTEXT.md`, using
    [CONTEXT-FORMAT.md](../grill-with-docs/CONTEXT-FORMAT.md). Keep the glossary
    free of implementation detail.
-6. Offer an ADR using [ADR-FORMAT.md](../grill-with-docs/ADR-FORMAT.md) only when
-   the decision is hard to reverse, surprising without context, and produced by
-   a real trade-off.
+6. Offer an ADR only when it meets the criteria in
+   [ADR-FORMAT.md](../grill-with-docs/ADR-FORMAT.md).
 
 ## Carry the model into code
 
@@ -38,9 +37,6 @@ decisions to its Advance phase.
   entities, aggregates, value objects, and repositories for genuine domain concepts.
 - Return to Advance when implementation reveals a domain
   contradiction. Do not encode an unconfirmed model silently.
-
-Verification checks code and test vocabulary, invariant placement, context
-boundaries, and adapter translations against the confirmed model.
 
 Create the glossary or ADR directory only when there is confirmed knowledge to
 record. Domain modeling is complete when language, boundaries, invariants,

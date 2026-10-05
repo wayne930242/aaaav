@@ -6,7 +6,7 @@ Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its pha
 
 ## Decision → `decision.md`
 
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` for every durable Decision step. Check that core rules are ready before implementation.
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` only when `decision.md` has an `open` row. Check that core rules are ready before implementation.
 
 The file holds outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Explore every consequential branch in:
 
@@ -17,8 +17,6 @@ The file holds outcome and actors; in and out of scope; concrete scenarios; conf
 ```
 
 Status is `grounded`, `confirmed`, or `open`. `grounded` comes from the request, source facts, or existing decisions; `confirmed` comes from the user; `open` is a consequential user-owned decision.
-
-A folder that already contains `requirements.md` continues using it as its decision artifact. New folders create `decision.md`.
 
 **Complete when:** no open row blocks observable behavior.
 
@@ -44,7 +42,7 @@ The file holds the chosen approach; interfaces and data flow affected; existing 
 
 ## Verify → `verification.md`
 
-Give every requirement in `spec.md` its own row:
+Review the diff against project standards, the approved spec, and the confirmed domain model; dispatch a verification agent when the anchor needs an independent observer. Give every requirement in `spec.md` its own row:
 
 ```markdown
 | Requirement | Evidence | Result |
@@ -56,7 +54,7 @@ Give every requirement in `spec.md` its own row:
 - **fail**: The anchor executed and observed a deviation from the spec or an error.
 - **unknown**: No anchor exercised the requirement in this run.
 
-Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its action, or `Reflexive: clean run.`
+Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. When friction notes exist, include a Reflexive section listing each with its classification (`misdirection` or `gap`) and its action.
 
 ## Updates
 
