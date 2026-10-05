@@ -5,7 +5,7 @@ description: Use when executing scoped, ambiguous, or multi-step source-changing
 
 # AAAAV Development Loop
 
-Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify** (also referenced as ADAAV: Align → Advance → Anchor → Act → Verify). Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
+Own source-changing work after entering the target project; its instructions and skills govern execution. Follow **AAAAV: Align → Advance → Anchor → Act → Verify**. Advance carries Decision → Spec → Design for durable Mini SDD work. Return when user intent or observable behavior changes.
 
 ## Align
 
@@ -53,7 +53,7 @@ Before the first production edit, state:
 
     Reality anchor: <the exact check that observes the changed behavior, and its checkpoint>
 
-Point the anchor at what the change touches: the specific test, command, interface, or reviewer that observes the changed behavior, sized to the change's actual reach. A one-line instruction edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. A dispatched run takes the anchor its coordinator assigned. A run with no coordinator chooses it from the task, user, and target project. The method inside may use an executable check, user operation, human judgment, or focused review. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
+Point the anchor at what the change touches: the specific test, command, interface, or reviewer that observes the changed behavior, sized to the change's actual reach. A one-line instruction edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. A dispatched run takes the anchor its coordinator assigned. A run with no coordinator chooses it from the task, user, and target project. Pick one method: an executable check, a user operation, human judgment, or a focused review. The checkpoint is the point where the anchor runs, normally once after the last increment. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
 
 ## Act
 
@@ -72,15 +72,15 @@ Durable work appends notes under `## Friction Notes` in `design.md`; inline work
 
 ## Verify
 
-A dispatched run verifies inside the anchor its coordinator assigned and hands back the completed work with that evidence. A run with no coordinator verifies here and dispatches its own verification agent when one is useful.
+A dispatched run verifies inside the anchor its coordinator assigned and hands back the completed work with that evidence.
 
 ### 1. Evidence Verification
 
-Exercise the chosen reality anchor and capture what it observed. Then review the diff separately against project standards, the approved contract, and the confirmed domain model. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
+Exercise the chosen reality anchor and capture what it observed. For Inline work, a green anchor plus a read of your own diff completes verification; report the contract with its observed output in one line. Durable work also reviews the diff against project standards, the approved spec, and the confirmed domain model, dispatches a verification agent when the anchor needs an independent observer, and records the table below in `verification.md`. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When those criteria cover UI or a human-use scenario, ask the user whether to run a `human-feedback` pass, and carry its verdict the same way.
 
 #### Verification Table Format
 
-Give every requirement in the contract its own `Requirement | Evidence | Result` row:
+Give every requirement in the spec its own `Requirement | Evidence | Result` row:
 
 | Requirement | Evidence | Result |
 |---|---|---|
@@ -90,16 +90,7 @@ Give every requirement in the contract its own `Requirement | Evidence | Result`
 - **fail**: The anchor executed and observed a deviation from the contract or an error.
 - **unknown**: The requirement was not directly exercised by an anchor in this run. A green test suite or passing unrelated check does not count as evidence for an unexercised requirement.
 
-#### Distinct Verification Claims
-
-Maintain clear boundaries between verification claims:
-- Local automated test runs (e.g. `pytest`, `npm test`)
-- Build and compilation checks
-- Interactive or CLI execution evidence
-- Browser / UI rendered inspection
-- Deployment or release status
-
-Do not conflate a local passing test with end-to-end integration or live deployment verification.
+Report local tests, builds, interactive runs, browser inspection, commit, push, CI, and deployment as separate claims; one never stands in for another.
 
 ### 2. Reflexive Pass
 
@@ -108,15 +99,16 @@ Read the friction notes and classify each one:
 - **misdirection**: the `Led by` instruction states or implies something the `Found` line contradicts.
 - **gap**: no instruction in use states the `Found` fact, so the run detoured to find it.
 
-With no notes, record `Reflexive: clean run.` and finish the pass.
-Otherwise invoke `solid-loop` with the classified notes.
+A gap the change itself resolved, or a general tool slip no instruction owns, is recorded as resolved.
+With nothing left, record `Reflexive: clean run.` and finish the pass.
+Otherwise invoke `solid-loop` with the remaining notes.
 
-**Complete when:** every requirement has credible evidence from its chosen anchor, every friction note is classified and applied through `solid-loop` (or the clean run is recorded), and every remaining verification gap is reported as incomplete. Keep local verification, commit, push, CI, deployment, and browser proof as distinct claims.
+**Complete when:** every requirement has credible evidence from its chosen anchor, every friction note is classified and either applied through `solid-loop` or recorded as resolved, and every remaining verification gap is reported as incomplete.
 
 ## Core Communication Rules
 
 1. **Show Your Reasoning**: When proposing designs, architecture, or non-obvious fixes, explain the underlying logic so the user can verify your thought process.
-2. **Proactively Report Problems**: Point out suboptimal code patterns, architectural seams, or missing safeguards immediately, even when not explicitly asked.
+2. **Report Problems You Meet**: Report problems found in the code the change touches as you meet them; fixes outside the contract go to the user rather than into the diff.
 3. **Direct and Concise**: State facts and findings plainly. Omit conversational filler, apologies, and sycophantic phrasing.
 4. **State Expected Behavior Directly**: Describe what the system should do. Avoid defensive warnings, prohibitive lists, or speculative guardrails.
 5. **Language Separation**: User communication in Traditional Chinese; code, tests, prompts, and internal skill instructions in English.

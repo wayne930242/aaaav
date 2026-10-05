@@ -34,7 +34,7 @@ Chosen approach; interfaces and data flow affected; existing precedent; decision
 
 ## `verification.md`
 
-One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its `solid-loop` action, or `Reflexive: clean run.` Keep local verification, commit, push, CI, deployment, and browser proof as separate claims.
+One `Requirement | Evidence | Result` row per requirement in `spec.md`, where `Result` is `pass`, `fail`, or `unknown`; then human appropriateness verdicts; deviations from the confirmed spec or design; unresolved verification gaps and their impact. Include a Reflexive section listing each friction note with its classification (`misdirection` or `gap`) and its `solid-loop` action, or `Reflexive: clean run.`
 
 ## Updates
 

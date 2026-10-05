@@ -17,7 +17,8 @@ narrow evidence or access needed. Do not theorize from code alone.
 
 ## Design and implementation
 
-1. Generate three to five falsifiable hypotheses with predicted observations.
+1. When the red loop does not already point at the cause, generate three to five
+   falsifiable hypotheses with predicted observations.
 2. Test them one variable at a time. Prefer debugger inspection, then targeted
    logs tagged with a unique `[DEBUG-xxxx]` prefix. Measure performance before
    changing performance code.
@@ -28,8 +29,7 @@ narrow evidence or access needed. Do not theorize from code alone.
 
 ## Verification
 
-- Re-run the original feedback loop and regression test.
-- Run the affected suite.
+- Re-run the original feedback loop, the regression test, and the affected suite.
 - Remove every tagged debug probe and throwaway artifact.
 - If three fix attempts fail against the same red loop, revisit the hypotheses or
    architecture before another attempt.
