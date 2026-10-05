@@ -72,6 +72,8 @@ Run only when friction notes exist; with none, finish Verify and print nothing a
 
 A gap the change itself resolved, or a general tool slip no instruction owns, is recorded as resolved. Invoke `solid-loop` with the remaining notes.
 
+**Complete when:** every requirement has evidence from its anchor or is reported `unknown`, and every friction note is applied through `solid-loop` or recorded as resolved.
+
 **Complete when:** every requirement has credible evidence from its chosen anchor, every friction note, if any, is applied through `solid-loop` or recorded as resolved, and every remaining verification gap is reported as incomplete.
 
 ## Standards and References
