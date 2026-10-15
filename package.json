@@ -1,6 +1,6 @@
 {
   "name": "aaaav",
-  "version": "0.6.7",
+  "version": "0.7.0",
   "description": "Streamlined AAAAV agent workflow package for pi: workflow skills plus a validator extension.",
   "author": "Wei Hung",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "type": "module",
   "keywords": ["pi-package", "aaaav", "agent-workflow"],
   "pi": {
-    "extensions": ["./pi/validate-tool-use.ts"],
+    "extensions": ["./pi/validate-tool-use.ts", "./pi/ttsr.ts"],
     "skills": ["./skills"]
   },
   "peerDependencies": {

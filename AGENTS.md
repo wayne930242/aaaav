@@ -1,6 +1,6 @@
 # Agent Working Agreements: aaaav
 
-This repository is the AAAAV pi package: the workflow skills in `skills/` and the pi extension `pi/validate-tool-use.ts`, which runs `hooks/validate_tool_use.py` after `write` and `edit`.
+This repository is the AAAAV pi package: the workflow skills in `skills/` and two pi extensions: `pi/validate-tool-use.ts`, which runs `hooks/validate_tool_use.py` after `write` and `edit`, and `pi/ttsr.ts`, a port of oh-my-pi's Time Traveling Stream Rules.
 
 ## Core Directives
 

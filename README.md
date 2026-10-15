@@ -6,6 +6,7 @@ The package provides:
 
 - **Workflow skills** in `skills/`, loaded by pi as package skills.
 - **Validator extension** `pi/validate-tool-use.ts`: after every successful `write` or `edit`, it runs `hooks/validate_tool_use.py` on the edited file and appends any suggestions to the tool result the model reads. It checks `SKILL.md` files, instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `rules/`), and durable artifacts under `docs/specs/`. The extension needs `python3` on `PATH`; when the validator cannot run, the tool result says so.
+- **Stream rules extension** `pi/ttsr.ts`: a port of oh-my-pi's Time Traveling Stream Rules. A Markdown rule in `~/.pi/agent/rules/` or `<project>/.pi/rules/` whose frontmatter has a `condition` regex is watched during the run. A match in streamed assistant text aborts the response, drops it, and retries with the rule injected; a match in tool arguments (the command for `bash`, the new text for `write` and `edit`) blocks the call with the rule as its reason. Frontmatter fields follow oh-my-pi: `condition`, `scope` (`text`, `thinking`, `tool`, `tool:bash`, `tool:edit(*.ts)`), `globs`, and `interruptMode` (`always`, `prose-only`, `tool-only`, `never`), plus `repeatMode` (`once` or `after-gap`) and `repeatGap`. A rule fires once per session by default. `astCondition`, `question`, and `agents` are not supported; a rule that uses them is skipped and reported. `/ttsr` lists the loaded rules.
 
 ## Concept
 

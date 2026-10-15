@@ -6,6 +6,7 @@
 
 - **工作流程 skill**：位於 `skills/`，由 pi 以套件 skill 載入。
 - **驗證 extension** `pi/validate-tool-use.ts`：每次 `write` 或 `edit` 成功後，對被修改的檔案執行 `hooks/validate_tool_use.py`，並把建議附加在模型讀到的 tool result 後面。檢查範圍包含 `SKILL.md`、指令檔（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`rules/`）以及 `docs/specs/` 下的 Durable 產出物。此 extension 需要 `PATH` 上有 `python3`；驗證器無法執行時，tool result 會註明原因。
+- **串流規則 extension** `pi/ttsr.ts`：移植自 oh-my-pi 的 Time Traveling Stream Rules。`~/.pi/agent/rules/` 或 `<專案>/.pi/rules/` 裡 frontmatter 帶有 `condition` regex 的 Markdown 規則，會在執行過程中被監看。assistant 串流文字命中時，中斷回應、丟棄那段輸出，並注入規則後重試；工具參數命中時（`bash` 看指令，`write`／`edit` 看新寫入的文字），直接擋下呼叫，以規則內容作為理由。frontmatter 欄位沿用 oh-my-pi：`condition`、`scope`（`text`、`thinking`、`tool`、`tool:bash`、`tool:edit(*.ts)`）、`globs`、`interruptMode`（`always`、`prose-only`、`tool-only`、`never`），另加 `repeatMode`（`once` 或 `after-gap`）與 `repeatGap`。預設每條規則每個 session 只觸發一次。不支援 `astCondition`、`question`、`agents`，用到的規則會被跳過並回報。`/ttsr` 列出已載入的規則。
 
 ## 概念
 
