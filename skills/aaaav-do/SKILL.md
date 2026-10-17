@@ -34,7 +34,7 @@ Before the first production edit, state:
 
     Reality anchor: <the exact check that observes the changed behavior, and its checkpoint>
 
-Point the anchor at what the change touches: the specific test, command, interface, or reviewer that observes the changed behavior, sized to the change's actual reach. A one-line instruction edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. A run with an assigned anchor takes it from its coordinator, and that anchor governs. Otherwise choose it from the task, user, and target project. Pick one method: an executable check, a user operation, human judgment, or a focused review. The checkpoint is the point where the anchor runs, normally once after the last increment. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
+Point the anchor at what the change touches: the specific test, command, interface, or reviewer that observes the changed behavior, sized to the change's actual reach. A one-line instruction edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. A run with an assigned anchor takes it from its coordinator, and that anchor governs. Otherwise choose it from the task, user, and target project. Pick one method: an executable check, a user operation, human judgment, or a focused review. A review anchor, chosen or assigned, names the severity that blocks and the realistic use it judges against; after fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is the point where the anchor runs, normally once after the last increment. Debugging reads [DEBUGGING.md](DEBUGGING.md) and establishes its red-capable loop before diagnosing.
 
 ## Act
 
@@ -51,7 +51,7 @@ Each time an attempt fails and a later attempt reveals why (a command errors, a 
 
 Durable work appends notes under `## Friction Notes` in `design.md`; inline work appends them to `scratch/friction.md`.
 
-Report problems found in the code the change touches as you meet them; fixes outside the contract go to the user rather than into the diff.
+Report problems found in the code the change touches as you meet them; fixes outside the contract, including pre-existing defects met while fixing review findings, go to the user as follow-ups rather than into the diff, because each extra fix reopens review on code the round never meant to touch.
 
 ## Verify
 
@@ -72,9 +72,7 @@ Run only when friction notes exist; with none, finish Verify and print nothing a
 
 A gap the change itself resolved, or a general tool slip no instruction owns, is recorded as resolved. Invoke `solid-loop` with the remaining notes.
 
-**Complete when:** every requirement has evidence from its anchor or is reported `unknown`, and every friction note is applied through `solid-loop` or recorded as resolved.
-
-**Complete when:** every requirement has credible evidence from its chosen anchor, every friction note, if any, is applied through `solid-loop` or recorded as resolved, and every remaining verification gap is reported as incomplete.
+**Complete when:** every requirement has credible evidence from its anchor or is reported `unknown`, and every friction note, if any, is applied through `solid-loop` or recorded as resolved.
 
 ## Standards and References
 

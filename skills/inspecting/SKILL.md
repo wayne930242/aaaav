@@ -23,7 +23,7 @@ Choose the lightest mode that can support a trustworthy conclusion:
 - **Standard:** several clear items. State a concise checklist, then proceed.
 - **High-risk or ambiguous:** security, production, destructive effects, or unclear boundaries. Present the plan; wait for confirmation only in a review the user started directly.
 
-Include only dimensions relevant to the request: correctness, edge cases, architecture, security, performance, conventions, dependencies, and side effects.
+Include only dimensions relevant to the request: correctness, edge cases, architecture, security, performance, conventions, dependencies, and side effects. Take the blocking severity and the use to judge against from the assignment; without them, judge realistic use and count a rare edge case as blocking only when it loses, silently overwrites, or corrupts data.
 
 ### Phase 2: Verify
 
