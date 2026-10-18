@@ -16,7 +16,7 @@ AAAAV gives an agent a short, repeatable workflow built on three skills:
    - **Align**: Restate intent in user terms; classify the change as **Inline** (localized, clear scope) or **Durable** (a decision that outlives the run).
    - **Advance**: Durable work moves through `Decision → Spec → Design`, settling contracts, seams, and decisions.
    - **Anchor**: Name the reality anchor and checkpoint before the first production edit.
-   - **Act**: Implement through the project's native practices. Every trial-and-error discovery becomes a friction note (`Tried` / `Found` / `Led by`) under `## Friction Notes` in `design.md`, or in `scratch/friction.md` for Inline work.
+   - **Act**: Implement through the project's native practices. Every trial-and-error discovery becomes a friction note (`Tried` / `Found` / `Led by`) under `## Friction Notes` in `design.md`, or in `scratch/friction.md` for Inline work. A run the user reviews after stepping away also keeps a decision trail in `scratch/decisions-<task-slug>.tsv`.
    - **Verify**: Exercise the anchor and report observations in a `Requirement | Evidence | Result` table. The **Reflexive** pass classifies each friction note as a **misdirection** (an instruction led the attempt the wrong way) or a **gap** (no instruction covered it, so the run detoured). A run without notes records a clean run.
 2. **`solid-loop`** (agent system correction):
    - Applies classified friction notes: corrects the misleading line, or places the missing fact in its single owning location.
@@ -92,3 +92,7 @@ bash scripts/validate.sh
 # Or run the full test suite, including the pi extension test (needs node)
 uv run --with pytest pytest -q
 ```
+
+## Acknowledgments
+
+Several workflow rules are adapted from [pstack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan and its port [pstack-claude](https://github.com/michael-denyer/pstack-claude) by Michael Denyer (both MIT License): the decision trail, closed review gate, and fresh-subagent hand-off in `aaaav-do`; testing the shared premise in its debugging branch; the evidence grades in `investigating` and `inspecting`; settling observable questions by experiment in `grilling`; and encoding lessons in structure and pinning derived copies in `solid-loop`. Ported skills credit their sources in their own footers.

@@ -19,7 +19,8 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
    - When none exists, write the fact as one direct sentence in its owning location: project facts in `AGENTS.md` or `CLAUDE.md`, procedure in the skill that ran the step.
    - Create a new skill when the gap is a multi-step procedure that no skill owns.
    - A fact the change itself resolved, or a general tool-use slip that no project or skill owns, needs no placement.
-3. **Hold the size.** Pair each added sentence with a merge or deletion in the same file, so the file ends no longer than it began.
+3. **Encode before you write.** When a fact can be enforced, enforce it at the highest level that works: architecture that removes the wrong path, a type, a lint or stream rule whose message names the fix, then a test. Prove the check fails on the recorded mistake. Prose is for judgment calls, because nothing fails when an agent skips it. A `Found` fact the agent system already states in prose is a repeat: escalate it in the same change. List each enforced rule beside its enforcer in the owning instruction file's rule table, and drop the row once the mistake can no longer happen.
+4. **Hold the size.** Pair each added sentence with a merge or deletion in the same file, so the file ends no longer than it began.
    When a fix exposes one fact stated in several places, keep one authoritative statement and replace the rest with a pointer or delete them.
    Run the no-op test on every section you edited and delete each sentence that fails.
 
@@ -48,6 +49,7 @@ Friction notes arrive classified as `misdirection` or `gap` by the `aaaav-do` re
 - **No-op test**: Evaluate each sentence in isolation and delete the ones that do not change behavior relative to the model's default.
 - **Single source of truth**: Give each operational contract one canonical home.
 - **Positive steering**: State the target behavior, because a prohibition names the unwanted pattern and makes it more likely; a prohibition or discipline skill keeps a negation only as an earned red line.
+- **Pin derived copies**: Record the upstream path and revision beside the credit of a skill, rule, or role derived from another source, and keep a check that fails when that upstream changes, so the derivation is redone instead of drifting.
 - **Earn the red line**: Admit a red line only when an observed failure backs it (a friction note's `Found` or a bare-run failure) and its reason or excuse → reality pair rides with it; delete the rest. The validator flags red-line inflation as an advisory.
 
 ## Output Contract

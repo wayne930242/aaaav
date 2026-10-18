@@ -16,7 +16,7 @@ AAAAV 為 agent 提供一套簡短、可重複的工作流程，由三個 skill 
    - **Align（對齊）**：用使用者的話重述需求，將變更歸類為 **Inline**（範圍局部、需求明確）或 **Durable**（決策需要延續到這次執行之後）。
    - **Advance（推進）**：Durable 任務依 `Decision → Spec → Design` 推進，收斂合約、介面邊界與決策。
    - **Anchor（定錨）**：在第一筆 production 修改前，宣告 reality anchor 與 checkpoint。
-   - **Act（實作）**：依目標專案的原生慣例實作。每次嘗試錯誤後發現的事，都記成一筆摩擦記錄（`Tried` / `Found` / `Led by`）；Durable 寫在 `design.md` 的 `## Friction Notes`，Inline 寫在 `scratch/friction.md`。
+   - **Act（實作）**：依目標專案的原生慣例實作。每次嘗試錯誤後發現的事，都記成一筆摩擦記錄（`Tried` / `Found` / `Led by`）；Durable 寫在 `design.md` 的 `## Friction Notes`，Inline 寫在 `scratch/friction.md`。使用者離開後才回來檢視的執行，另外在 `scratch/decisions-<task-slug>.tsv` 留決策軌跡。
    - **Verify（驗證）**：執行錨點，以 `Requirement | Evidence | Result` 表記錄觀察結果。**Reflexive（反思）** 將每筆摩擦記錄歸類為 **misdirection**（skill 或指令把嘗試帶錯方向）或 **gap**（沒有 skill 或指令涵蓋，只好繞路找答案）；沒有記錄就標記為 clean run。
 2. **`solid-loop`**（修正 agent 系統）：
    - 套用已分類的摩擦記錄：修正誤導的那一行，或把缺少的事實放進唯一負責的位置。
@@ -92,3 +92,7 @@ bash scripts/validate.sh
 # 或執行完整測試套件，包含 pi extension 測試（需要 node）
 uv run --with pytest pytest -q
 ```
+
+## 致謝
+
+數條工作流規則改寫自 Lauren Tan 的 [pstack](https://github.com/cursor/plugins/tree/main/pstack) 與 Michael Denyer 的移植版 [pstack-claude](https://github.com/michael-denyer/pstack-claude)（皆為 MIT 授權）：`aaaav-do` 的決策軌跡、審查關卡保持關閉與交接給新 subagent；除錯分支的共同前提檢查；`investigating` 與 `inspecting` 的證據分級；`grilling` 以實驗解決可觀察的問題；`solid-loop` 的教訓結構化與衍生副本 pin。移植而來的 skill 在各自的頁尾註明出處。

@@ -38,7 +38,17 @@ Point the anchor at what the change touches: the specific test, command, interfa
 
 ## Act
 
-The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md`, agent state, or diary.
+The harness-native plan owns sequencing. Follow the target project's native practices and work in the smallest useful increments. Mini SDD creates no `tasks.md` or agent state; an unattended run keeps only the decision trail below.
+
+Give follow-up work (a fix round, a retry, the next item) to a fresh subagent carrying the original brief, every later directive, and the prior report and branch, because a resumed chain silently drops directives; resume an existing subagent only for state it alone holds, such as uncommitted changes or a running process. Read each subagent's diff and write its summary yourself.
+
+### Decision Trail
+
+A run the user reviews after stepping away (overnight, autonomous, or multi-phase) appends one row per fork, completed unit, pivot, or blocker to `scratch/decisions-<task-slug>.tsv`:
+
+    ts	decision	why	evidence	result
+
+Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads its last rows, then writes a `start` row naming itself. Before handing back, check every row against what the run actually did and build the report from the trail.
 
 ### Friction Notes
 
@@ -62,6 +72,8 @@ A dispatched run verifies inside the anchor its coordinator assigned and hands b
 Exercise the chosen reality anchor and capture what it observed. For Inline work, a green anchor plus a read of your own diff completes verification; report the contract with its observed output in one line. Durable work verifies as [MINI-SDD.md](MINI-SDD.md) describes. A requirement the anchor did not exercise is `unknown`; a green unrelated suite is not evidence for it. A human checkpoint owns criteria that require human judgment; record its verdict distinctly from executable or review evidence. When such a criterion is still `unknown` after the anchor runs, propose a `human-feedback` pass and carry its verdict the same way; otherwise report it as a human checkpoint without asking. When a coordinator assigned the anchor, that anchor governs.
 
 Report local tests, builds, interactive runs, browser inspection, commit, push, CI, and deployment as separate claims; one never stands in for another.
+
+A review anchor stays open until an independent reviewer returns its verdict. When none can run or its result is lost, report `blocked: independent review` and keep merge and release closed; the author's own review, green tests, and CI each miss what an independent reader catches, so none substitutes.
 
 ### 2. Reflexive Pass
 

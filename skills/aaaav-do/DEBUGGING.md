@@ -31,5 +31,8 @@ narrow evidence or access needed. Do not theorize from code alone.
 
 - Run the regression test and the affected suite.
 - Remove every tagged debug probe and throwaway artifact.
-- If three fix attempts fail against the same red loop, revisit the hypotheses or
-   architecture before another attempt.
+- When two fixes that rest on one premise fail the same red loop, write that
+  premise as one sentence and test it directly, with an observation that comes
+  out differently if it is false, before another fix; each failure is evidence
+  against it. A contradicted premise sends you back to the hypotheses; a
+  confirmed one means the fixes treated a consequence, so ask the next why.

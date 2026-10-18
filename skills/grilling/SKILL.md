@@ -17,7 +17,7 @@ Format each question like this:
 
 Each answer reshapes the tree. Recompute the frontier before the next round. A question that still depends on another open decision belongs to a later round.
 
-Finding facts is the agent's job. Use the environment and available tools; delegate independent fact-finding only when it materially saves time. The decisions are the user's: put each frontier question to them and wait.
+Finding facts is the agent's job. Use the environment and available tools; delegate independent fact-finding only when it materially saves time. A question whose answer you could observe by running something (behavior, timing, layout, output, performance) is a fact: settle it with a check or `prototype`. The decisions are the user's: put each remaining product or preference question to them and wait.
 
 The session is complete when the frontier is empty and every branch has been visited. Write the answers into the caller-provided decision artifact, if any, and return the confirmed decisions to the caller.
 

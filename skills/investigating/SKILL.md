@@ -13,8 +13,12 @@ description: Use when researching questions, diagnosing root causes, or gatherin
      code, specifications, or first-party APIs
    - runtime: reproducible commands, logs, errors, and test output
 3. Cross-check material claims and resolve source conflicts.
-4. Separate confirmed facts, supported inference, and unknowns.
-5. Report the reasoning chain with a source beside each material claim.
+4. Grade each material claim by its strongest evidence: asserted, cited
+   (`file:line` or primary source), reasoned (the failure path walked and shown
+   not to reach), executed (a script or test against the real code), or
+   reproduced (observed in the running system). A claim with no evidence is
+   `unknown`.
+5. Report the reasoning chain with each material claim's source and grade beside it.
 
 When another workflow supplies an artifact path, return evidence in the shape
 that phase needs. Do not create a parallel plan or specification.
