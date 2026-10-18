@@ -44,11 +44,11 @@ Give follow-up work (a fix round, a retry, the next item) to a fresh subagent ca
 
 ### Decision Trail
 
-A run the user reviews after stepping away (overnight, autonomous, or multi-phase) appends one row per fork, completed unit, pivot, or blocker to `scratch/decisions-<task-slug>.tsv`:
+A run the user reviews after stepping away (overnight, autonomous, or multi-phase) records one row per fork, completed unit, pivot, or blocker in `scratch/decisions-<task-slug>.tsv` through [scripts/decision_log.py](scripts/decision_log.py), which keeps rows single-line and safe to open in a spreadsheet:
 
-    ts	decision	why	evidence	result
+    python3 scripts/decision_log.py append <log> <decision> <why> <evidence> <result>
 
-Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads its last rows, then writes a `start` row naming itself. Before handing back, check every row against what the run actually did and build the report from the trail.
+Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads it with `tail <log>`, then runs `start <log> <run-id>`. Before handing back, check every row against what the run actually did and build the report from the trail.
 
 ### Friction Notes
 
