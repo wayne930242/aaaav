@@ -11,7 +11,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 const ANCHOR = /Reality anchor:/;
 const EXEMPT_IN_PROJECT = ["scratch", "docs/specs"];
 const EXEMPT_ROOTS = [tmpdir(), "/tmp", "/var/folders"];
-const EXEMPT_EXTENSIONS = [".md", ".txt"];
+const EXEMPT_EXTENSIONS = [".md", ".txt", ".html", ".htm"];
 
 export const WARNING =
 	"aaaav anchor gate: a change ran before the reply stated " +
@@ -37,7 +37,7 @@ function within(root: string, target: string): boolean {
 	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/** Markdown and text files, scratch and spec folders in the project, and temp files outside it; a project that lives in a temp dir is still gated. */
+/** Markdown, text, and HTML files, scratch and spec folders in the project, and temp files outside it; a project that lives in a temp dir is still gated. */
 export function exempt(filePath: string, cwd: string): boolean {
 	if (EXEMPT_EXTENSIONS.includes(extname(filePath).toLowerCase())) return true;
 	const root = real(cwd);

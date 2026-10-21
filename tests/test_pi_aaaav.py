@@ -156,12 +156,14 @@ class TestAnchorGate(ExtensionCase):
         ])
         self.assertEqual(self.warned_steps(out), [5])
 
-    def test_text_files_scratch_specs_temp_paths_and_other_tools_pass(self):
+    def test_text_and_html_files_scratch_specs_temp_paths_and_other_tools_pass(self):
         out = self.replay([
             {"event": "session_start"},
             user_start(),
             tool_call("write", "README.md"),
             tool_call("edit", "notes/todo.TXT"),
+            tool_call("write", "report/index.html"),
+            tool_call("edit", "legacy/page.HTM"),
             tool_call("write", "scratch/friction.json"),
             tool_call("edit", "docs/specs/2026-10-21-x/design.html"),
             tool_call("write", str(Path(tempfile.gettempdir()) / "aaaav-gate-outside" / "page.html")),

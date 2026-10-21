@@ -25,7 +25,7 @@ aaaav            核心循環 · 原則 · playbook：autonomous-run、pause、p
 
 | 檔案 | 作用 |
 | --- | --- |
-| `pi/anchor-gate.ts` | 使用者最新一則訊息之後，assistant 還沒寫出 `Reality anchor:` 就執行 `write` 或 `edit` 時，每則訊息顯示一次警告，但不擋下呼叫。`.md`、`.txt` 檔、`scratch/`、`docs/specs/` 和專案外的暫存檔不警告。透過 `bash` 改檔不在檢查範圍內。 |
+| `pi/anchor-gate.ts` | 使用者最新一則訊息之後，assistant 還沒寫出 `Reality anchor:` 就執行 `write` 或 `edit` 時，每則訊息顯示一次警告，但不擋下呼叫。`.md`、`.txt`、`.html` 檔、`scratch/`、`docs/specs/` 和專案外的暫存檔不警告。透過 `bash` 改檔不在檢查範圍內。 |
 | `pi/decision-tool.ts` | `aaaav_decision` 工具把一筆決策寫進 TSV 決策軌跡，每筆只佔一行，用試算表開啟也安全；接手別人的軌跡時寫一筆 `start`。 |
 | `pi/second-thought.ts` | 呼叫過 `write`、`edit` 或 `bash` 的執行結束前，透過 pi 的 classifier registry 問 Jev（TypeSafe 的型別化決策模型）：最後的回覆有沒有證明需求已達成、需要哪一級 review、品質如何。Jev 也會判斷這則回覆是不是提醒點，也就是把工作交回給使用者的地方；只是確認收到、回報進度或等待中的回覆不提醒。在提醒點上，quality < 1.5 或 review 是 `full` 時，加一則看得到的提醒並讓 agent 多跑一輪，每輪最多一次；agent 可以不同意，直接結束。只有 done < 0.25 時，只顯示提醒，不多跑一輪。需求是使用者最新打的訊息；extension 送進來的訊息（intercom、monitor 喚醒）不會取代它。由這類訊息開始的那一輪，會連同 `trigger: wake` 和那則訊息一起送出，依那則訊息要求的事評估。呼叫過 `MonitorCreate`、`LoopCreate`、`goal_wait` 或 `subagent` 類工具的執行是在等喚醒，不評估。只送出需求、trigger、喚醒訊息和最後的回覆。沒有 TypeSafe key 時記為 `unknown`，不做任何事。在 subagent session 裡（pi-herdr-agents 的 `PI_SUBAGENT_ID`，或 pi-subagents 的 `PI_SUBAGENT_CHILD`）完全不啟用，結果交給派出它的 agent 判斷。 |
 | `pi/validate-tool-use.ts` | 每次 `write` 或 `edit` 後對該檔執行 `hooks/validate_tool_use.py`，替 `SKILL.md`、指令檔（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`rules/`）和 `docs/specs/` 產出物附上建議。需要 `PATH` 上有 `python3`。 |
