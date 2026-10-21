@@ -7,7 +7,7 @@ This repository is the `pi-aaaav` package: the workflow skills in `skills/` and 
 - All prompts, agent instructions, and code comments must be in English.
 - User communication must always be in Traditional Chinese (繁體中文).
 - Prompts, documentation, and guidelines state expected behavior directly, without defensive phrasing or prohibitive lists.
-- Work runs through an entry skill over the loop in `skills/aaaav/SKILL.md`; `pi/anchor-gate.ts` holds edits until a Reality anchor is stated.
+- Work runs through an entry skill over the loop in `skills/aaaav/SKILL.md`; `pi/anchor-gate.ts` warns when an edit runs before a Reality anchor is stated.
 - Commit messages must not mention AI tools.
 
 ## Versioning & Release Directives

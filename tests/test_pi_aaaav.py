@@ -33,9 +33,10 @@ register({
   registerTool: (tool) => { tools[tool.name] = tool; },
 });
 const classifyPlan = JSON.parse(classifyJson);
-const out = { results: [], classifyCalls: [] };
+const out = { results: [], classifyCalls: [], notices: [] };
 const ctx = {
   cwd,
+  ui: { notify: (message, level) => out.notices.push({ step: out.results.length, message, level }) },
   sessionManager: { getBranch: () => JSON.parse(branchJson) },
   modelRegistry: {
     findOfType: (...args) => {
@@ -126,57 +127,71 @@ class ExtensionCase(unittest.TestCase):
 class TestAnchorGate(ExtensionCase):
     extension = "anchor-gate.ts"
 
-    def test_edit_without_anchor_is_blocked_with_the_fix(self):
-        result = self.replay([{"event": "session_start"}, user_start(), tool_call("edit")])["results"][-1]
-        self.assertTrue(result["block"])
-        self.assertIn("Reality anchor:", result["reason"])
+    def warned_steps(self, out: dict) -> list[int]:
+        for notice in out["notices"]:
+            self.assertEqual(notice["level"], "warning")
+            self.assertIn("Reality anchor:", notice["message"])
+        return [notice["step"] for notice in out["notices"]]
 
-    def test_anchor_line_opens_the_gate_until_the_next_user_prompt(self):
-        results = self.replay([
+    def test_edit_without_anchor_warns_once_per_user_message_and_never_blocks(self):
+        out = self.replay([
+            {"event": "session_start"},
+            user_start(),
+            tool_call("edit"),
+            tool_call("write"),
+            user_start("now the import"),
+            tool_call("edit"),
+        ])
+        self.assertEqual(out["results"], [None] * 6)
+        self.assertEqual(self.warned_steps(out), [2, 5])
+
+    def test_anchor_line_silences_the_warning_until_the_next_user_prompt(self):
+        out = self.replay([
             {"event": "session_start"},
             user_start(),
             assistant("Alignment: fix it.\nReality anchor: pytest tests/test_export.py"),
             tool_call("write"),
             user_start("now the import"),
             tool_call("write"),
-        ])["results"]
-        self.assertIsNone(results[3])
-        self.assertTrue(results[5]["block"])
+        ])
+        self.assertEqual(self.warned_steps(out), [5])
 
-    def test_scratch_specs_and_temp_paths_and_other_tools_pass(self):
-        results = self.replay([
+    def test_text_files_scratch_specs_temp_paths_and_other_tools_pass(self):
+        out = self.replay([
             {"event": "session_start"},
             user_start(),
-            tool_call("write", "scratch/friction.md"),
-            tool_call("edit", "docs/specs/2026-10-21-x/design.md"),
+            tool_call("write", "README.md"),
+            tool_call("edit", "notes/todo.TXT"),
+            tool_call("write", "scratch/friction.json"),
+            tool_call("edit", "docs/specs/2026-10-21-x/design.html"),
             tool_call("write", str(Path(tempfile.gettempdir()) / "aaaav-gate-outside" / "page.html")),
             tool_call("bash"),
-        ])["results"]
-        self.assertEqual(results[2:], [None, None, None, None])
+        ])
+        self.assertEqual(out["notices"], [])
 
-    def test_a_user_message_that_steers_the_running_loop_closes_the_gate(self):
-        results = self.replay([
+    def test_a_user_message_that_steers_the_running_loop_rearms_the_warning(self):
+        out = self.replay([
             {"event": "session_start"},
             user_start(),
             assistant("Reality anchor: pytest"),
             user_start("also rename it"),
             tool_call("edit"),
-        ])["results"]
-        self.assertTrue(results[-1]["block"])
+        ])
+        self.assertEqual(self.warned_steps(out), [4])
 
     def test_resumed_session_ignores_an_anchor_stated_before_the_last_user_message(self):
         branch = [
             {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest"}]}},
             {"type": "message", "message": {"role": "user", "content": "now the import"}},
         ]
-        self.assertTrue(self.replay([{"event": "session_start"}, tool_call("edit")], branch)["results"][-1]["block"])
+        self.assertEqual(self.warned_steps(self.replay([{"event": "session_start"}, tool_call("edit")], branch)), [1])
 
     def test_resumed_session_keeps_an_anchor_stated_after_the_last_user_message(self):
         branch = [
             {"type": "message", "message": {"role": "user", "content": "fix it"}},
             {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest"}]}},
         ]
-        self.assertIsNone(self.replay([{"event": "session_start"}, tool_call("edit")], branch)["results"][-1])
+        self.assertEqual(self.replay([{"event": "session_start"}, tool_call("edit")], branch)["notices"], [])
 
 
 class TestDecisionTool(ExtensionCase):
