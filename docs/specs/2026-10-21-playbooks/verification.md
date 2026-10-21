@@ -19,8 +19,8 @@
 ## Deviations
 
 - The Phase 2 tests stub `ctx.modelRegistry` instead of an injected fetch, because pi's classifier registry owns the HTTP call.
-- The gate does not see edits made through `bash`; the first live run edited with `printf >>` and was never gated. Recorded as a follow-up.
-- Jev's `done` threshold of 0.5 sits on the scores of replies that carry evidence (0.32, 0.41, 0.46–0.53) while bare claims score 0.02–0.05; recorded as a follow-up.
+- The gate does not see edits made through `bash`; the first live run edited with `printf >>` and was never gated. The user chose to leave it (2026-10-21); the README states it.
+- Jev's `done` threshold moved from 0.5 to 0.25 with the user's approval (2026-10-21): replies that carry evidence scored 0.32, 0.41, and 0.46–0.53, bare claims 0.02–0.05. Each verdict is recorded as a session custom entry for later calibration.
 
 ## Friction Notes
 

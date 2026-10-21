@@ -13,7 +13,7 @@ const REQUEST_CHARS = 1500;
 const REPLY_CHARS = 3000;
 const TIMEOUT_MS = 15_000;
 
-export const THRESHOLDS = { doneBelow: 0.5, qualityBelow: 1.5, reviewTier: "full" };
+export const THRESHOLDS = { doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
 
 export const QUESTIONS = {
 	done: {

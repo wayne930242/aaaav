@@ -230,6 +230,10 @@ class TestSecondThought(ExtensionCase):
         self.assertNotIn("continue", result)
         self.assertEqual(result["entries"][0]["data"]["concerns"], [])
 
+    def test_an_evidenced_reply_near_half_is_not_a_concern(self):
+        result = self.run_turn(answers(0.3, "focused", 2.0))["results"][3]
+        self.assertNotIn("continue", result)
+
     def test_failure_records_unknown_and_continues_nothing(self):
         result = self.run_turn("throw")["results"][3]
         self.assertEqual(result["entries"][0]["data"], {"verdict": "unknown", "reason": "network down"})
