@@ -10,6 +10,7 @@
  * reports progress, or waits gets no reminder. A wrong review tier or low quality gets one
  * advisory continuation per run; a low done score is only shown. The agent is never
  * blocked. Only the request, the trigger, the wake message, and the final reply are sent.
+ * A subagent session registers nothing: the agent that spawned it judges its result.
  */
 
 import { type ExtensionAPI, parseSkillBlock } from "@earendil-works/pi-coding-agent";
@@ -115,7 +116,14 @@ function text(content: unknown): string {
 		.trim();
 }
 
+// pi-herdr-agents marks its children with PI_SUBAGENT_ID, pi-subagents with PI_SUBAGENT_CHILD,
+// and avtc's pi-subagent with PI_SUBAGENT_CHILD_AGENT plus PI_SUBAGENT_PARENT_PID.
+export function isSubagent(env: NodeJS.ProcessEnv = process.env): boolean {
+	return Boolean(env.PI_SUBAGENT_ID) || env.PI_SUBAGENT_CHILD === "1" || Boolean(env.PI_SUBAGENT_CHILD_AGENT && env.PI_SUBAGENT_PARENT_PID);
+}
+
 export default function (pi: ExtensionAPI) {
+	if (isSubagent()) return;
 	let request = "";
 	let reply = "";
 	let worked = false;

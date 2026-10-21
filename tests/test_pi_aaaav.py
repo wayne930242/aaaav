@@ -1,6 +1,7 @@
 """Loads the aaaav loop extensions with a stub pi API and replays events against them."""
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -108,12 +109,15 @@ class ExtensionCase(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def replay(self, steps: list[dict], branch: list | None = None, classify: object = None) -> dict:
+    def replay(self, steps: list[dict], branch: list | None = None, classify: object = None, env: dict | None = None) -> dict:
+        # A suite run inside a subagent must not inherit its markers.
+        base = {key: value for key, value in os.environ.items() if not key.startswith("PI_SUBAGENT_")}
         proc = subprocess.run(
             ["node", "--input-type=module", "-e", HARNESS, (PI_DIR / self.extension).as_uri(), str(self.cwd),
              json.dumps(steps), json.dumps(branch or []), json.dumps(classify)],
             capture_output=True,
             text=True,
+            env={**base, **(env or {})},
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return json.loads(proc.stdout.strip().splitlines()[-1])
@@ -345,6 +349,15 @@ class TestSecondThought(ExtensionCase):
             out = self.run_turn(plan)
             self.assertIsNone(out["results"][3], plan)
             self.assertEqual(out["classifyCalls"], [], plan)
+
+    def test_a_subagent_session_is_never_judged(self):
+        steps = [user_start(), tool_call("bash"), assistant("Done, tests pass."), SETTLE]
+        markers = [{"PI_SUBAGENT_ID": "child-1"}, {"PI_SUBAGENT_CHILD": "1"},
+                   {"PI_SUBAGENT_CHILD_AGENT": "worker", "PI_SUBAGENT_PARENT_PID": "42"}]
+        for env in markers:
+            out = self.replay(steps, classify=answers(0.1, "full", 0), env=env)
+            self.assertIsNone(out["results"][3], env)
+            self.assertEqual(out["classifyCalls"], [], env)
 
     def test_a_run_that_changed_nothing_is_not_judged(self):
         out = self.replay([user_start(), assistant("It works like this."), SETTLE], classify=answers(0.1, "full", 0))
