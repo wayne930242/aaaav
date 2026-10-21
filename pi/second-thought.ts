@@ -21,7 +21,7 @@ export const THRESHOLDS = { doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "ful
 
 export const QUESTIONS = {
 	done: {
-		type: "bool",
+		type: "bool" as const,
 		instructions: "Does `reply` show, with evidence, that `request` is fully met?",
 		criteria: {
 			true: "every part of the request has observed evidence in the reply: command output, a test result, or an artifact",
@@ -29,7 +29,7 @@ export const QUESTIONS = {
 		},
 	},
 	review: {
-		type: "choice",
+		type: "choice" as const,
 		instructions: "What review should the change described in `reply` get before it is merged or released?",
 		criteria: {
 			none: "trivial, fully covered by a passing check",
@@ -38,7 +38,7 @@ export const QUESTIONS = {
 		},
 	},
 	quality: {
-		type: "score",
+		type: "score" as const,
 		instructions: "How acceptable is the delivered work against `request`?",
 		criteria: [
 			"unacceptable: wrong or broken",
@@ -47,7 +47,7 @@ export const QUESTIONS = {
 			"strong: meets it with direct evidence and no excess",
 		],
 	},
-} as const;
+};
 
 type Block = { type: string; text?: string };
 type Answers = Record<string, { type: string; probability?: number; choice?: string; probabilities?: Record<string, number>; score?: number }>;
@@ -145,7 +145,9 @@ export default function (pi: ExtensionAPI) {
 		asked = true;
 		const record = (data: Record<string, unknown>) => ({ type: "custom" as const, customType: ENTRY_TYPE, data });
 		const jev = ctx.modelRegistry.findOfType("classifier", "typesafe", "jev-latest");
-		if (!jev || !ctx.modelRegistry.hasConfiguredAuth(jev)) return;
+		// hasConfiguredAuth is typed for chat models but reads only `provider`, which a classifier has too.
+		type AuthModel = Parameters<typeof ctx.modelRegistry.hasConfiguredAuth>[0];
+		if (!jev || !ctx.modelRegistry.hasConfiguredAuth(jev as unknown as AuthModel)) return;
 		let verdict: Verdict | undefined;
 		let reason = "";
 		try {
