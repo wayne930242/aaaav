@@ -53,7 +53,7 @@ for (const step of JSON.parse(stepsJson)) {
   try {
     const result = step.tool
       ? await tools[step.tool].execute("t1", step.params, undefined, undefined, ctx)
-      : await handlers[step.event](step.payload ?? {}, ctx);
+      : await handlers[step.event]?.(step.payload ?? {}, ctx);
     out.results.push(result ?? null);
   } catch (error) {
     out.results.push({ error: error.message });
@@ -80,6 +80,7 @@ def typed(source: str, text: str = "x") -> dict:
 
 
 SETTLED = {"event": "agent_settled", "payload": {"aborted": False}}
+AGENT_START = {"event": "agent_start", "payload": {}}
 
 SETTLE = {"event": "agent_before_settle", "payload": {"outcome": "completed", "entries": [], "continue": False}}
 
@@ -281,16 +282,29 @@ class TestSecondThought(ExtensionCase):
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
 
+    def test_an_extension_text_with_surrounding_whitespace_still_matches(self):
+        steps = [user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
+                 typed("extension", "wake\n"), user_start("wake\n"), tool_call("bash"), assistant("Shipped."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it"])
+
+    def test_a_swallowed_extension_text_is_forgotten_once_the_session_settles(self):
+        steps = [typed("extension", "ship it"), SETTLED, user_start("ship it"),
+                 tool_call("bash"), assistant("Shipped."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
+
     def test_a_recheck_continuation_does_not_ask_again(self):
-        steps = [user_start(), tool_call("bash"), assistant("Done."), SETTLE,
-                 tool_call("bash"), assistant("Rechecked, tests pass."), SETTLE]
+        # pi fires agent_start again for the continuation; the recheck runs bash again.
+        steps = [user_start(), AGENT_START, tool_call("bash"), assistant("Done."), SETTLE,
+                 AGENT_START, tool_call("bash"), assistant("Rechecked, tests pass."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "full", 2.9))
-        self.assertTrue(out["results"][3]["continue"])
-        self.assertIsNone(out["results"][6])
+        self.assertTrue(out["results"][4]["continue"])
+        self.assertIsNone(out["results"][8])
         self.assertEqual(len(out["classifyCalls"]), 1)
 
     def test_work_before_a_compaction_continuation_still_counts(self):
-        steps = [user_start(), tool_call("edit"), {"event": "agent_start", "payload": {}}, assistant("Done."), SETTLE]
+        steps = [user_start(), tool_call("edit"), AGENT_START, assistant("Done."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(len(out["classifyCalls"]), 1)
 

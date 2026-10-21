@@ -113,12 +113,16 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("input", (event) => {
-		if (event.source === "extension") sent.set(event.text, (sent.get(event.text) ?? 0) + 1);
+		if (event.source !== "extension") return;
+		const said = event.text.trim();
+		sent.set(said, (sent.get(said) ?? 0) + 1);
 	});
 
 	// Each run is judged on its own work. State resets once the session settles, so a
 	// continuation (this extension's recheck, or one after compaction) stays in the same run.
+	// An extension text still pending then was swallowed or dropped and will not land.
 	pi.on("agent_settled", () => {
+		sent.clear();
 		reply = "";
 		worked = false;
 		waiting = false;
