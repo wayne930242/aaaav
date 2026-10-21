@@ -1,0 +1,19 @@
+---
+name: answering
+description: Use when explaining a concept or how something works, comparing technical alternatives, summarizing results or a change for the user, or when the user says they do not follow (看不懂, show me, 講清楚一點).
+---
+
+# Answering
+
+Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is that every material claim carries its source and its evidence grade as `investigating` defines them; gather missing evidence through `investigating` first.
+
+Keep prose brief and state uncertainty where it lives. Show the shape beside the sentence it supports, with the smallest view that makes the point: a call tree or file tree for structure, pseudocode for logic, `A → B: message` lines for interaction, a table for options against criteria.
+
+## Playbooks
+
+- [explain](playbooks/explain.md): how something works, what changed, or what a result means.
+- [compare](playbooks/compare.md): choosing between alternatives.
+
+---
+
+The views are adapted from HumanLayer's [show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me) (MIT, © 2026 HumanLayer).

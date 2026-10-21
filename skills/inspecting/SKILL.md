@@ -1,17 +1,20 @@
 ---
 name: inspecting
-description: Use when auditing or reviewing a specific target, diff, commit, or spec.
+description: Use when auditing or reviewing a specific target, diff, commit, or spec, or running final QA or a release-readiness check.
 ---
 
 # Inspecting
 
-Define the evidence needed, check it, and give each scoped item a verdict.
+Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is that every scoped item has a verdict and its evidence.
 
 When a reviewer role contract is present, it governs scope, evidence, and report format; add only the Standards and Spec axes.
 
-For a branch, pull request, worktree, or change-set review, read
-[DIFF-REVIEW.md](DIFF-REVIEW.md) first and use its fixed-point Standards/Spec
-branch.
+## Playbooks
+
+- [diff-review](playbooks/diff-review.md): a branch, pull request, worktree, or change set.
+- [qa-release](playbooks/qa-release.md): final exploratory QA or release readiness.
+
+Any other target runs the flow below directly.
 
 ## Inspection Flow
 
@@ -43,7 +46,4 @@ For each scoped item:
 ```
 
 Lead with the conclusion. Prioritize failures and recommended actions by impact. Name any unverified boundary instead of implying full coverage.
-
-When another workflow supplies an artifact path, return verdicts to that phase's
-artifact rather than creating a separate report.
 

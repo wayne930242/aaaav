@@ -18,8 +18,8 @@ Two entries:
   accepted a feedback pass. Name the real interface and the flows to operate,
   then collect what the person observed.
 
-Route a crash or reproducible failure to `aaaav-do` debugging and a
-request for new behavior to its implementation path. A reaction with no
+Route a crash or reproducible failure to the `coding` bug-fix playbook and a
+request for new behavior to its feature playbook. A reaction with no
 identifiable target may be venting; ask whether the user wants it investigated.
 
 **Complete when:** there is a working code, design, or documentation target the
@@ -72,10 +72,10 @@ input.
 
 ## 4. Hand off
 
-Return the confirmed chain to `aaaav-do` as decision input for the
-source-changing fix.
+Return the confirmed chain as decision input to `coding` for a source fix, or
+to `writing` for a document fix.
 
-**Complete when:** no change was requested, or `aaaav-do` has received a
+**Complete when:** no change was requested, or the owning entry has received a
 confirmed correction target.
 
 ## 5. Reflexive System Placement

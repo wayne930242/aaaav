@@ -6,7 +6,7 @@ Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its pha
 
 ## Decision → `decision.md`
 
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grill-with-docs` only when `decision.md` has an `open` row. Check that core rules are ready before implementation.
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grilling` with `decision.md` only when it has an `open` row. Check that core rules are ready before implementation.
 
 The file holds outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Explore every consequential branch in:
 
@@ -34,7 +34,7 @@ Approved from: <the user reply that approved it, empty while proposed>
 
 ## Design → `design.md`
 
-Choose the smallest approach that fits the approved spec and architecture. Invoke `codebase-design` when interfaces or seams change, `prototype` when a named question is cheaper to settle by experiment, and the project's exact skill.
+Choose the smallest approach that fits the approved spec and architecture. Follow the matching playbook's design steps ([feature](playbooks/feature.md) for interfaces and seams, [prototype](playbooks/prototype.md) when a named question is cheaper to settle by experiment) and the project's exact skill.
 
 The file holds the chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. A straightforward design may be short, but it still names precedent and seam. Friction notes recorded during Act go under `## Friction Notes`.
 

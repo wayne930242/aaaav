@@ -1,6 +1,6 @@
-# Fixed-point diff review
+# Diff review
 
-Use this branch for a branch, pull request, worktree, or change-set review.
+**You own a separate verdict on each axis, measured from a fixed point.**
 
 ## Establish the evidence boundary
 
@@ -47,11 +47,9 @@ Quote or point to the governing requirement for each finding. When no spec is
 available, mark this axis insufficient evidence instead of reconstructing intent
 from the implementation.
 
-## Report
-
-Return separate `Standards` and `Spec` verdicts with file/hunk evidence. Give a
-finding count and worst issue within each axis; do not collapse them into one
-score because success on one axis cannot mask failure on the other.
+**Reply:** separate `Standards` and `Spec` verdicts with file/hunk evidence, and
+a finding count and worst issue within each axis, never one combined score,
+because success on one axis cannot mask failure on the other.
 
 ---
 

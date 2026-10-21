@@ -19,10 +19,10 @@ there is none.
 4. Check asserted behavior against code. Let the user decide when current code
    and intended domain truth disagree.
 5. Record a confirmed term immediately in `CONTEXT.md`, using
-   [CONTEXT-FORMAT.md](../grill-with-docs/CONTEXT-FORMAT.md). Keep the glossary
+   [CONTEXT-FORMAT.md](CONTEXT-FORMAT.md). Keep the glossary
    free of implementation detail.
 6. Offer an ADR only when it meets the criteria in
-   [ADR-FORMAT.md](../grill-with-docs/ADR-FORMAT.md).
+   [ADR-FORMAT.md](ADR-FORMAT.md).
 
 ## Carry the model into code
 
@@ -35,7 +35,7 @@ there is none.
   domain model by accident.
 - Use tactical DDD patterns only when they clarify real domain rules. Reserve
   entities, aggregates, value objects, and repositories for genuine domain concepts.
-- Return to Advance when implementation reveals a domain
+- Return to Align when implementation reveals a domain
   contradiction. Do not encode an unconfirmed model silently.
 
 Create the glossary or ADR directory only when there is confirmed knowledge to

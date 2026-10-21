@@ -61,22 +61,31 @@ def check_skill_md(path: Path) -> list[str]:
                 "Move detailed guidelines or templates to references/ to keep SKILL.md streamlined."
             )
 
-    # 3. Broken markdown links
-    local_links = extract_markdown_links(text)
-    for link in local_links:
-        target = (skill_dir / link).resolve()
-        if not target.exists():
-            warnings.append(f"broken local link: {link}")
+    # 3. Broken markdown links, followed through every Markdown file SKILL.md reaches
+    root = skill_dir.resolve()
+    reached: dict[Path, str] = {path.resolve(): text}
+    linked: set[Path] = set()
+    pending = [path.resolve()]
+    while pending:
+        source = pending.pop()
+        for link in extract_markdown_links(reached[source]):
+            target = (source.parent / link).resolve()
+            if not target.exists():
+                where = "" if source == path.resolve() else f" (in {source.relative_to(root).as_posix()})"
+                warnings.append(f"broken local link: {link}{where}")
+                continue
+            linked.add(target)
+            if target.suffix == ".md" and target.is_relative_to(root) and target not in reached:
+                reached[target] = target.read_text(encoding="utf-8")
+                pending.append(target)
 
     # 4. Orphaned files check
-    linked_normalized = {str(Path(link)).replace("\\", "/") for link in local_links}
+    corpus = "\n".join(reached.values())
     for f in skill_dir.rglob("*"):
         if f == path or f.is_dir():
             continue
-        rel = str(f.relative_to(skill_dir)).replace("\\", "/")
-        in_link = rel in linked_normalized
-        in_text = rel in text or f.name in text
-        if not (in_link or in_text):
+        rel = f.relative_to(skill_dir).as_posix()
+        if not (f.resolve() in linked or rel in corpus or f.name in corpus):
             warnings.append(f"orphaned file not referenced in SKILL.md: {rel}")
 
     # 5. Defensive phrasing check

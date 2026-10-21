@@ -98,6 +98,28 @@ description: Use when executing streamlined tasks.
         warnings = check_skill_md(skill_file)
         self.assertTrue(any("orphaned file not referenced" in w for w in warnings))
 
+    def test_links_inside_linked_files(self):
+        skill_dir = self.base_path / "my-skill"
+        (skill_dir / "playbooks").mkdir(parents=True)
+        (skill_dir / "references").mkdir()
+        (skill_dir / "references" / "shape.md").write_text("# Shape", encoding="utf-8")
+        (skill_dir / "playbooks" / "fix.md").write_text(
+            "See [shape](../references/shape.md) and [gone](missing.md).", encoding="utf-8"
+        )
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            """---
+name: my-skill
+description: Use when executing streamlined tasks.
+---
+- [fix](playbooks/fix.md)
+""",
+            encoding="utf-8",
+        )
+        warnings = check_skill_md(skill_file)
+        self.assertIn("broken local link: missing.md (in playbooks/fix.md)", warnings)
+        self.assertFalse(any("orphaned" in w for w in warnings), warnings)
+
     def test_defensive_anti_pattern_detection(self):
         skill_dir = self.base_path / "my-skill"
         skill_dir.mkdir()

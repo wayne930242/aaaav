@@ -6,10 +6,22 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "keywords": ["pi-package", "aaaav", "agent-workflow"],
+  "keywords": [
+    "pi-package",
+    "aaaav",
+    "agent-workflow"
+  ],
   "pi": {
-    "extensions": ["./pi/validate-tool-use.ts", "./pi/ttsr.ts"],
-    "skills": ["./skills"]
+    "extensions": [
+      "./pi/validate-tool-use.ts",
+      "./pi/ttsr.ts",
+      "./pi/anchor-gate.ts",
+      "./pi/decision-tool.ts",
+      "./pi/second-thought.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
