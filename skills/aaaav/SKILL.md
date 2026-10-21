@@ -23,7 +23,7 @@ Before the first change, state:
 
 The aaaav extension holds `write` and `edit` outside `scratch/` and `docs/specs/` until this line appears after the user's latest message.
 
-Size the anchor to the change's actual reach and pick one method: an executable check, a user operation, human judgment, or a focused review. An anchor assigned by a coordinator governs. A review anchor names the severity that blocks and the realistic use it judges against; after fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is normally once, after the last increment.
+Size the anchor to the change's actual reach and pick one method: an executable check, a user operation, human judgment, or a focused review. An anchor assigned by a coordinator governs. Pick a review anchor when the change touches a shared contract, authorization or permission data, a migration, or security, or when the Jev second thought rates its review `full`; other changes rest on their check and the author's own read of the diff. A review anchor names the realistic use it judges against and blocks on P0 and P1 findings only, recording lower ones as follow-ups; after fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is normally once, after the last increment.
 
 ## Act
 
