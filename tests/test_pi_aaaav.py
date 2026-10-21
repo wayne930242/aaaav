@@ -75,6 +75,12 @@ def tool_call(tool: str, path: str = "src/app.py") -> dict:
     return {"event": "tool_call", "payload": {"toolName": tool, "toolCallId": "c1", "input": {"path": path, "command": "pytest"}}}
 
 
+def typed(source: str) -> dict:
+    return {"event": "input", "payload": {"text": "x", "source": source}}
+
+
+AGENT_START = {"event": "agent_start", "payload": {}}
+
 SETTLE = {"event": "agent_before_settle", "payload": {"outcome": "completed", "entries": [], "continue": False}}
 
 
@@ -255,6 +261,33 @@ class TestSecondThought(ExtensionCase):
                  user_start("second"), tool_call("bash"), assistant("Done second."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual([call["request"] for call in out["classifyCalls"]], ["first", "second"])
+
+    def test_a_low_done_score_alone_is_shown_without_a_continuation(self):
+        result = self.run_turn(answers(0.05, "focused", 2.5))["results"][3]
+        self.assertNotIn("continue", result)
+        self.assertIn("done 0.05", result["entries"][1]["content"])
+        self.assertNotIn("Recheck", result["entries"][1]["content"])
+
+    def test_a_message_an_extension_sends_does_not_replace_the_request(self):
+        steps = [typed("interactive"), user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE,
+                 typed("extension"), user_start("New intercom message above."), AGENT_START,
+                 tool_call("bash"), assistant("Shipped."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it", "ship it"])
+
+    def test_a_run_that_arranged_a_wake_is_not_judged(self):
+        for tool in ("MonitorCreate", "subagent"):
+            steps = [user_start(), tool_call("bash"), tool_call(tool), assistant("Waiting on it."), SETTLE]
+            out = self.replay(steps, classify=answers(0.0, "full", 0))
+            self.assertIsNone(out["results"][4], tool)
+            self.assertEqual(out["classifyCalls"], [], tool)
+
+    def test_the_run_after_a_wake_is_judged_on_its_own_work(self):
+        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE,
+                 AGENT_START, assistant("Still waiting."), SETTLE,
+                 AGENT_START, tool_call("bash"), assistant("Shipped."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
 
     def test_without_a_key_or_a_classifier_nothing_is_asked_or_recorded(self):
         for plan in ("no-auth", "missing"):
