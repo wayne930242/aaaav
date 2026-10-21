@@ -75,11 +75,11 @@ def tool_call(tool: str, path: str = "src/app.py") -> dict:
     return {"event": "tool_call", "payload": {"toolName": tool, "toolCallId": "c1", "input": {"path": path, "command": "pytest"}}}
 
 
-def typed(source: str) -> dict:
-    return {"event": "input", "payload": {"text": "x", "source": source}}
+def typed(source: str, text: str = "x") -> dict:
+    return {"event": "input", "payload": {"text": text, "source": source}}
 
 
-AGENT_START = {"event": "agent_start", "payload": {}}
+SETTLED = {"event": "agent_settled", "payload": {"aborted": False}}
 
 SETTLE = {"event": "agent_before_settle", "payload": {"outcome": "completed", "entries": [], "continue": False}}
 
@@ -269,11 +269,30 @@ class TestSecondThought(ExtensionCase):
         self.assertNotIn("Recheck", result["entries"][1]["content"])
 
     def test_a_message_an_extension_sends_does_not_replace_the_request(self):
-        steps = [typed("interactive"), user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE,
-                 typed("extension"), user_start("New intercom message above."), AGENT_START,
+        steps = [typed("interactive", "ship it"), user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
+                 typed("extension", "New intercom message above."), user_start("New intercom message above."),
                  tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it", "ship it"])
+        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it"])
+
+    def test_an_extension_input_that_never_lands_does_not_shift_later_messages(self):
+        steps = [typed("extension", "swallowed"), typed("interactive", "ship it"), user_start("ship it"),
+                 tool_call("bash"), assistant("Shipped."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
+
+    def test_a_recheck_continuation_does_not_ask_again(self):
+        steps = [user_start(), tool_call("bash"), assistant("Done."), SETTLE,
+                 tool_call("bash"), assistant("Rechecked, tests pass."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "full", 2.9))
+        self.assertTrue(out["results"][3]["continue"])
+        self.assertIsNone(out["results"][6])
+        self.assertEqual(len(out["classifyCalls"]), 1)
+
+    def test_work_before_a_compaction_continuation_still_counts(self):
+        steps = [user_start(), tool_call("edit"), {"event": "agent_start", "payload": {}}, assistant("Done."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual(len(out["classifyCalls"]), 1)
 
     def test_a_run_that_arranged_a_wake_is_not_judged(self):
         for tool in ("MonitorCreate", "subagent"):
@@ -283,9 +302,9 @@ class TestSecondThought(ExtensionCase):
             self.assertEqual(out["classifyCalls"], [], tool)
 
     def test_the_run_after_a_wake_is_judged_on_its_own_work(self):
-        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE,
-                 AGENT_START, assistant("Still waiting."), SETTLE,
-                 AGENT_START, tool_call("bash"), assistant("Shipped."), SETTLE]
+        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE, SETTLED,
+                 assistant("Still waiting."), SETTLE, SETTLED,
+                 tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
 

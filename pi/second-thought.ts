@@ -4,7 +4,7 @@
  * Only what the user typed counts as the request: messages that extensions send
  * (intercom, monitor wakes) do not replace it. A run that arranged a wake (a monitor,
  * a loop, a subagent) is waiting, not finished, and is not judged. A wrong review tier
- * or low quality gets one advisory continuation; a low done score is only shown.
+ * or low quality gets one advisory continuation per request; a low done score is only shown.
  * The agent is never blocked. Only the request and the final reply are sent.
  */
 
@@ -104,19 +104,24 @@ export default function (pi: ExtensionAPI) {
 	let worked = false;
 	let waiting = false;
 	let asked = false;
-	// Sources of submitted inputs, in order, until their user messages land.
-	const sources: boolean[] = [];
+	// Texts extensions sent as user messages that have not landed yet; matched by content,
+	// since another handler may swallow an input or a queue may be cleared before it lands.
+	const sent = new Map<string, number>();
 
-	pi.on("input", (event) => {
-		sources.push(event.source !== "extension");
+	pi.on("session_start", () => {
+		sent.clear();
 	});
 
-	// Each run is judged on its own work against the user's latest request.
-	pi.on("agent_start", () => {
+	pi.on("input", (event) => {
+		if (event.source === "extension") sent.set(event.text, (sent.get(event.text) ?? 0) + 1);
+	});
+
+	// Each run is judged on its own work. State resets once the session settles, so a
+	// continuation (this extension's recheck, or one after compaction) stays in the same run.
+	pi.on("agent_settled", () => {
 		reply = "";
 		worked = false;
 		waiting = false;
-		asked = false;
 	});
 
 	pi.on("tool_call", (event) => {
@@ -129,7 +134,12 @@ export default function (pi: ExtensionAPI) {
 		const msg = event.message as { role?: string; content?: unknown };
 		const said = text(msg.content);
 		if (msg.role === "user") {
-			if (!(sources.shift() ?? true)) return;
+			const pending = sent.get(said) ?? 0;
+			if (pending > 0) {
+				if (pending === 1) sent.delete(said);
+				else sent.set(said, pending - 1);
+				return;
+			}
 			const skill = parseSkillBlock(said);
 			request = skill ? (skill.userMessage ?? `/skill:${skill.name}`) : said;
 			reply = "";
