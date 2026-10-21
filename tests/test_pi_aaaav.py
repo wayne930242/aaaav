@@ -85,10 +85,11 @@ AGENT_START = {"event": "agent_start", "payload": {}}
 SETTLE = {"event": "agent_before_settle", "payload": {"outcome": "completed", "entries": [], "continue": False}}
 
 
-def answers(done: float, review: str, quality: float) -> dict:
+def answers(done: float, review: str, quality: float, checkpoint: float = 0.9) -> dict:
     return {
         "stopReason": "stop",
         "answers": {
+            "checkpoint": {"type": "bool", "probability": checkpoint},
             "done": {"type": "bool", "probability": done},
             "review": {"type": "choice", "choice": review, "probabilities": {review: 0.6}, "confidence": 0.4},
             "quality": {"type": "score", "score": quality, "confidence": 0.5},
@@ -226,7 +227,7 @@ class TestSecondThought(ExtensionCase):
         self.assertEqual([entry["type"] for entry in first["entries"]], ["custom", "custom_message"])
         self.assertIn("done 0.11", first["entries"][1]["content"])
         self.assertIsNone(second)
-        self.assertEqual(out["classifyCalls"], [{"request": "fix the export", "reply": "Done, tests pass."}])
+        self.assertEqual(out["classifyCalls"], [{"request": "fix the export", "trigger": "user", "wake": "", "reply": "Done, tests pass."}])
 
     def test_full_review_tier_alone_is_a_concern(self):
         out = self.run_turn(answers(0.9, "full", 2.8))
@@ -250,7 +251,7 @@ class TestSecondThought(ExtensionCase):
         steps = [user_start("r" * 2000), tool_call("bash"), assistant("y" * 5000), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(out["findArgs"], ["classifier", "typesafe", "jev-latest"])
-        self.assertEqual(out["classifyCalls"], [{"request": "r" * 1500, "reply": "y" * 3000}])
+        self.assertEqual(out["classifyCalls"], [{"request": "r" * 1500, "trigger": "user", "wake": "", "reply": "y" * 3000}])
 
     def test_a_skill_command_sends_the_users_words_not_the_skill_body(self):
         expanded = '<skill name="coding" location="/Users/me/skills/coding/SKILL.md">\n' + "body " * 500 + "\n</skill>\n\nfix the export"
@@ -269,30 +270,47 @@ class TestSecondThought(ExtensionCase):
         self.assertIn("done 0.05", result["entries"][1]["content"])
         self.assertNotIn("Recheck", result["entries"][1]["content"])
 
-    def test_a_message_an_extension_sends_does_not_replace_the_request(self):
+    def test_a_run_an_extension_message_starts_is_judged_against_the_typed_request(self):
         steps = [typed("interactive", "ship it"), user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
                  typed("extension", "New intercom message above."), user_start("New intercom message above."),
                  tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it"])
+        self.assertEqual([(call["request"], call["trigger"], call["wake"]) for call in out["classifyCalls"]],
+                         [("ship it", "user", ""), ("ship it", "wake", "New intercom message above.")])
+
+    def test_a_custom_message_that_wakes_a_run_is_sent_as_the_wake(self):
+        def custom(text: str, kind: str = "pi-loop-monitor") -> dict:
+            return {"event": "message_end", "payload": {"message": {"role": "custom", "customType": kind, "content": text}}}
+        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE, SETTLED,
+                 custom("Monitor #2 started"), custom("Monitor #2 done: if on npm, pin it."),
+                 tool_call("bash"), assistant("Pinned."), custom("note", "aaaav-second-thought"), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "Monitor #2 done: if on npm, pin it.", "reply": "Pinned."}])
+
+    def test_a_reply_that_is_not_a_checkpoint_gets_no_reminder(self):
+        result = self.run_turn(answers(0.02, "full", 0.5, checkpoint=0.1))["results"][3]
+        self.assertNotIn("continue", result)
+        self.assertEqual([entry["type"] for entry in result["entries"]], ["custom"])
+        self.assertEqual(result["entries"][0]["data"]["concerns"], [])
+        self.assertEqual(result["entries"][0]["data"]["checkpoint"], 0.1)
 
     def test_an_extension_input_that_never_lands_does_not_shift_later_messages(self):
         steps = [typed("extension", "swallowed"), typed("interactive", "ship it"), user_start("ship it"),
                  tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "user", "wake": "", "reply": "Shipped."}])
 
     def test_an_extension_text_with_surrounding_whitespace_still_matches(self):
         steps = [user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
                  typed("extension", "wake\n"), user_start("wake\n"), tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["ship it"])
+        self.assertEqual([(call["request"], call["trigger"]) for call in out["classifyCalls"]], [("ship it", "user"), ("ship it", "wake")])
 
     def test_a_swallowed_extension_text_is_forgotten_once_the_session_settles(self):
         steps = [typed("extension", "ship it"), SETTLED, user_start("ship it"),
                  tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "user", "wake": "", "reply": "Shipped."}])
 
     def test_a_recheck_continuation_does_not_ask_again(self):
         # pi fires agent_start again for the continuation; the recheck runs bash again.
@@ -320,7 +338,7 @@ class TestSecondThought(ExtensionCase):
                  assistant("Still waiting."), SETTLE, SETTLED,
                  tool_call("bash"), assistant("Shipped."), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "reply": "Shipped."}])
+        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "", "reply": "Shipped."}])
 
     def test_without_a_key_or_a_classifier_nothing_is_asked_or_recorded(self):
         for plan in ("no-auth", "missing"):
