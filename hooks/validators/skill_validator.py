@@ -45,6 +45,12 @@ def check_skill_md(path: Path) -> list[str]:
         if "name" not in fields or not fields["name"].strip():
             warnings.append("missing required frontmatter field: 'name'")
 
+        # The regex parser accepts what pi's YAML parser rejects, and pi then skips the whole skill.
+        for key in ("name", "description"):
+            raw = next((line.split(":", 1)[1].strip() for line in lines[1:] if line.startswith(f"{key}:")), "")
+            if raw and raw[0] not in "\"'|>" and (": " in raw or " #" in raw):
+                warnings.append(f"quote the {key}: YAML reads an unquoted ': ' or ' #' as syntax, and pi skips the skill")
+
         if "description" not in fields or not fields["description"].strip():
             warnings.append("missing required frontmatter field: 'description'")
         else:

@@ -34,6 +34,17 @@ Direct instructions for execution.
         warnings = check_skill_md(skill_file)
         self.assertEqual(warnings, [])
 
+    def test_unquoted_value_that_yaml_rejects(self):
+        skill_dir = self.base_path / "my-skill"
+        skill_dir.mkdir()
+        skill_file = skill_dir / "SKILL.md"
+        for value, broken in (("Use when editing code: tests too.", True), ("Use when editing code #1.", True),
+                              ('"Use when editing code: tests too."', False), ("Use when editing code, tests too.", False)):
+            with self.subTest(value=value):
+                skill_file.write_text(f"---\nname: my-skill\ndescription: {value}\n---\n\n# My Skill\n", encoding="utf-8")
+                warnings = check_skill_md(skill_file)
+                self.assertEqual(any("quote the description" in w for w in warnings), broken, warnings)
+
     def test_missing_frontmatter(self):
         skill_dir = self.base_path / "my-skill"
         skill_dir.mkdir()

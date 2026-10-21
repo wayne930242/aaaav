@@ -1,6 +1,6 @@
 ---
 name: coding
-description: Use when changing source code or its tests: fixing a bug, adding or changing behavior, refactoring, improving performance, or prototyping a design question.
+description: Use when changing source code or its tests, such as fixing a bug, adding or changing behavior, refactoring, improving performance, or prototyping a design question.
 ---
 
 # Coding
