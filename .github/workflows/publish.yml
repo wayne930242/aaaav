@@ -1,0 +1,31 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run python hooks/validate_all.py .
+      - run: uv run --with pytest pytest -q
+      - name: Publish unless this version is already on npm
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          test "v$version" = "$GITHUB_REF_NAME"
+          if npm view "pi-aaaav@$version" version >/dev/null 2>&1; then
+            echo "pi-aaaav@$version is already published"
+          else
+            npm publish --access public
+          fi

@@ -1,15 +1,32 @@
 {
-  "name": "aaaav",
-  "version": "0.9.1",
-  "description": "Streamlined AAAAV agent workflow package for pi: workflow skills plus a validator extension.",
+  "name": "pi-aaaav",
+  "version": "1.0.0",
+  "description": "Agent workflow skills for pi: one entry skill per task type, each with playbooks, over a shared Align → Anchor → Act → Verify loop, plus loop extensions (anchor gate, decision trail tool, Jev second thought, skill validator, stream rules).",
   "author": "Wei Hung",
   "license": "MIT",
-  "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wayne930242/aaaav.git"
+  },
+  "homepage": "https://github.com/wayne930242/aaaav#readme",
   "keywords": [
     "pi-package",
+    "pi",
+    "pi-coding-agent",
     "aaaav",
-    "agent-workflow"
+    "agent-workflow",
+    "skills",
+    "playbooks"
+  ],
+  "files": [
+    "pi",
+    "skills",
+    "hooks/validate_tool_use.py",
+    "hooks/validators/*.py",
+    "README.md",
+    "README.zh-TW.md",
+    "LICENSE"
   ],
   "pi": {
     "extensions": [

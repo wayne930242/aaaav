@@ -1,98 +1,61 @@
-# aaaav
+# pi-aaaav
 
-精簡化的 AAAAV Agent 工作流程套件，供 [pi](https://github.com/earendil-works/pi) 使用。
+[English](README.md)
 
-本套件提供：
+給 [pi](https://github.com/earendil-works/pi) 用的 agent 工作流程 skill 和循環 extension。每一種主要任務都從自己的 skill 進來，選一本 playbook，然後跑同一個循環：**Align → Anchor → Act → Verify**。
 
-- **工作流程 skill**：位於 `skills/`，由 pi 以套件 skill 載入。
-- **驗證 extension** `pi/validate-tool-use.ts`：每次 `write` 或 `edit` 成功後，對被修改的檔案執行 `hooks/validate_tool_use.py`，並把建議附加在模型讀到的 tool result 後面。檢查範圍包含 `SKILL.md`、指令檔（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`rules/`）以及 `docs/specs/` 下的 Durable 產出物。此 extension 需要 `PATH` 上有 `python3`；驗證器無法執行時，tool result 會註明原因。
-- **串流規則 extension** `pi/ttsr.ts`：移植自 oh-my-pi 的 Time Traveling Stream Rules。`~/.pi/agent/rules/` 或 `<專案>/.pi/rules/` 裡 frontmatter 帶有 `condition` regex 的 Markdown 規則，會在執行過程中被監看。assistant 串流文字命中時，中斷回應、丟棄那段輸出，並注入規則後重試；工具參數命中時（`bash` 看指令，`write`／`edit` 看新寫入的文字），直接擋下呼叫，以規則內容作為理由。frontmatter 欄位沿用 oh-my-pi：`condition`、`scope`（`text`、`thinking`、`tool`、`tool:bash`、`tool:edit(*.ts)`）、`globs`、`interruptMode`（`always`、`prose-only`、`tool-only`、`never`），另加 `repeatMode`（`once` 或 `after-gap`）與 `repeatGap`。預設每條規則每個 session 只觸發一次。不支援 `astCondition`、`question`、`agents`，用到的規則會被跳過並回報。`/ttsr` 列出已載入的規則。
+## Skill
 
-## 概念
-
-AAAAV 為 agent 提供一套簡短、可重複的工作流程，由三個 skill 組成：
-
-1. **`aaaav-do`**（開發循環）：
-   - **Align（對齊）**：用使用者的話重述需求，將變更歸類為 **Inline**（範圍局部、需求明確）或 **Durable**（決策需要延續到這次執行之後）。
-   - **Advance（推進）**：Durable 任務依 `Decision → Spec → Design` 推進，收斂合約、介面邊界與決策。
-   - **Anchor（定錨）**：在第一筆 production 修改前，宣告 reality anchor 與 checkpoint。
-   - **Act（實作）**：依目標專案的原生慣例實作。每次嘗試錯誤後發現的事，都記成一筆摩擦記錄（`Tried` / `Found` / `Led by`）；Durable 寫在 `design.md` 的 `## Friction Notes`，Inline 寫在 `scratch/friction.md`。使用者離開後才回來檢視的執行，另外在 `scratch/decisions-<task-slug>.tsv` 留決策軌跡。
-   - **Verify（驗證）**：執行錨點，以 `Requirement | Evidence | Result` 表記錄觀察結果。**Reflexive（反思）** 將每筆摩擦記錄歸類為 **misdirection**（skill 或指令把嘗試帶錯方向）或 **gap**（沒有 skill 或指令涵蓋，只好繞路找答案）；沒有記錄就標記為 clean run。
-2. **`solid-loop`**（修正 agent 系統）：
-   - 套用已分類的摩擦記錄：修正誤導的那一行，或把缺少的事實放進唯一負責的位置。
-   - 防止 skill 膨脹：新增前先找是否已有相同陳述，對每個改過的段落做 no-op 檢查，並讓每個 `SKILL.md` 維持在 300 行以內。
-3. **`boot-loop`**（建立 agent 系統）：
-   - 派出數個獨立 worker，透過 `aaaav-do` 執行調查任務。
-   - 合併 worker 回傳的摩擦記錄，執行一次 `solid-loop`，建立或精煉 `AGENTS.md` 與專案 skill。
-
-## Skill 一覽
-
-| Skill | 使用時機 |
-| --- | --- |
-| `aaaav-do` | 執行有範圍、需求模糊或多步驟的程式碼修改。 |
-| `solid-loop` | 建立、修改或檢查 agent skill 與指令，或套用摩擦記錄。 |
-| `boot-loop` | 以調查型 tracer 任務建立或翻修 agent 系統，最後合併執行一次 `solid-loop`。 |
-| `investigating` | 研究問題、診斷根因或蒐集證據。 |
-| `inspecting` | 稽核或審查特定目標、diff、commit 或 spec。 |
-| `assuring-quality` | 最終 QA、探索式驗證或發佈前檢查。 |
-| `human-feedback` | 評估使用者回饋或進行互動式 UI 驗證。 |
-| `grilling` | 釐清屬於使用者的決策或模糊的架構取捨。 |
-| `grill-me` | 使用者要求針對某個想法被追問。 |
-| `grill-with-docs` | 探討 Durable 決策、領域術語或 ADR。 |
-| `codebase-design` | 設計或修改模組介面與邊界。 |
-| `domain-modeling` | 精煉專案術語或領域邊界。 |
-| `prototype` | 以可丟棄的程式碼解答架構問題或驗證假設。 |
-
-## 用法
-
-### 1. 安裝方式
-
-從 GitHub 安裝：
-
-```bash
-pi install git:github.com/wayne930242/aaaav
+```text
+aaaav            核心循環 · 原則 · playbook：autonomous-run、pause、pickup
+├─ answering     explain · compare
+├─ investigating research · diagnose
+├─ inspecting    diff-review · qa-release
+├─ coding        bug-fix · feature · refactoring · perf · prototype（+ Mini SDD）
+├─ writing       draft · tighten · comments
+└─ solid-loop    apply-friction · author-skill · bootstrap
+共用             grilling · domain-modeling · human-feedback
 ```
 
-或安裝本機 checkout；pi 會直接從該路徑載入、不複製，修改在下一個 session 生效：
+- **`aaaav`** 放每一種任務都成立的做法：重述任務、選入口的 playbook 並把步驟抄進 `todo`、第一筆修改前寫出 `Reality anchor:`、以小步前進且先刪後加、依 anchor 驗證，並記下 friction note。Reflexive pass 會把 friction note 交給 `solid-loop`。`PRINCIPLES.md` 列出 playbook 引用的原則，使用者也可以用這些名稱中途修正方向。三本生命週期 playbook 處理無人看管的執行、乾淨的暫停，以及接手前一輪的工作。
+- **入口 skill** 各自寫出這類任務的 anchor，並列出自己的 playbook。每本 playbook 先用一句話說明它負責什麼，接著是編號步驟，最後一行 `Reply:` 規定回報要包含什麼。
+- **共用 skill** 由入口呼叫：`grilling` 處理使用者要做的決定，`domain-modeling` 處理術語和 ADR，`human-feedback` 處理對成品的反應。
+
+## Extension
+
+| 檔案 | 作用 |
+| --- | --- |
+| `pi/anchor-gate.ts` | 使用者最新一則訊息之後，assistant 還沒寫出 `Reality anchor:` 之前，擋下 `write` 和 `edit`。`scratch/`、`docs/specs/` 和專案外的暫存檔不擋。透過 `bash` 改檔不在檢查範圍內。 |
+| `pi/decision-tool.ts` | `aaaav_decision` 工具把一筆決策寫進 TSV 決策軌跡，每筆只佔一行，用試算表開啟也安全；接手別人的軌跡時寫一筆 `start`。 |
+| `pi/second-thought.ts` | 呼叫過 `write`、`edit` 或 `bash` 的執行結束前，透過 pi 的 classifier registry 問 Jev（TypeSafe 的型別化決策模型）：最後的回覆有沒有證明需求已達成、需要哪一級 review、品質如何。done < 0.25、quality < 1.5 或 review 是 `full` 時，加一則看得到的提醒並讓 agent 多跑一輪；agent 可以不同意，直接結束。只送出使用者最新的需求和最後的回覆。沒有 TypeSafe key 時記為 `unknown`，不做任何事。 |
+| `pi/validate-tool-use.ts` | 每次 `write` 或 `edit` 後對該檔執行 `hooks/validate_tool_use.py`，替 `SKILL.md`、指令檔（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`rules/`）和 `docs/specs/` 產出物附上建議。需要 `PATH` 上有 `python3`。 |
+| `pi/ttsr.ts` | 移植自 oh-my-pi 的 Time Traveling Stream Rules。`~/.pi/agent/rules/` 或 `<專案>/.pi/rules/` 裡 frontmatter 帶有 `condition` regex 的 Markdown 規則，會在執行過程中被監看。assistant 串流文字命中時，中斷回應、丟棄那段輸出，並注入規則後重試；工具參數命中時（`bash` 看指令，`write`／`edit` 看新寫入的文字），直接擋下呼叫，以規則內容作為理由。frontmatter 欄位沿用 oh-my-pi：`condition`、`scope`（`text`、`thinking`、`tool`、`tool:bash`、`tool:edit(*.ts)`）、`globs`、`interruptMode`（`always`、`prose-only`、`tool-only`、`never`），另加 `repeatMode`（`once` 或 `after-gap`）與 `repeatGap`。預設每條規則每個 session 只觸發一次。不支援 `astCondition`、`question`、`agents`，用到的規則會被跳過並回報。`/ttsr` 列出已載入的規則。 |
+
+## 安裝
+
+```bash
+pi install npm:pi-aaaav
+```
+
+本機 checkout 會直接載入，改完 `/reload` 就生效：
 
 ```bash
 pi install /path/to/aaaav
 ```
 
-加上 `-l` 會寫入目前專案的 `.pi/settings.json`，而非使用者設定。移除時執行 `pi remove <相同 source>`。
-
-### 2. 呼叫開發循環 (`aaaav-do`)
-
-任何涉及代碼修改的工作均透過 `aaaav-do` 驅動：
-
-```text
-# Inline 模式（局部小修改）
-Alignment: 為電子郵件欄位加入格式驗證
-Inline — Contract: 在 API 入口處拒絕無效電子郵件並回傳 HTTP 400
-Authorization: 使用者請求加入電子郵件驗證
-Reality anchor: pytest tests/test_email.py
-
-# Durable 模式（涉及架構或跨會話之變更）
-Alignment: 實作多租戶認證機制
-# 依序推進產出 docs/specs/YYYY-MM-DD-<slug>/:
-# 1. decision.md     (收斂事實，確認核心規則準備度)
-# 2. spec.md         (宣告 Reality Anchor，需待使用者核准)
-# 3. design.md       (最小架構設計與介面邊界)
-# 4. verification.md (填寫三欄客觀驗證表與 Reflexive 反思檢討)
-```
-
-### 3. 工作流與技能驗證
-
-驗證 skill、規則與 Durable 產出物：
+## 開發
 
 ```bash
-# 執行工作區驗證與 unittest 測試套件
-bash scripts/validate.sh
-
-# 或執行完整測試套件，包含 pi extension 測試（需要 node）
-uv run --with pytest pytest -q
+uv run python hooks/validate_all.py .   # 檢查 skill、規則與 durable spec
+uv run --with pytest pytest -q          # 驗證器與 pi extension 的測試（需要 node）
 ```
 
 ## 致謝
 
-數條工作流規則改寫自 Lauren Tan 的 [pstack](https://github.com/cursor/plugins/tree/main/pstack) 與 Michael Denyer 的移植版 [pstack-claude](https://github.com/michael-denyer/pstack-claude)（皆為 MIT 授權）：`aaaav-do` 的決策軌跡、審查關卡保持關閉與交接給新 subagent；除錯分支的共同前提檢查；`investigating` 與 `inspecting` 的證據分級；`grilling` 以實驗解決可觀察的問題；`solid-loop` 的教訓結構化與衍生副本 pin。移植而來的 skill 在各自的頁尾註明出處。
+- Lauren Tan 的 [pstack](https://github.com/backnotprop/pstack)（MIT），鏡像 repo 的版本 `e44668c`，上游是 [cursor/plugins](https://github.com/cursor/plugins/tree/main/pstack)；以及 Michael Denyer 的移植版 [pstack-claude](https://github.com/michael-denyer/pstack-claude)（MIT）：依任務類型分的 playbook、具名原則、生命週期 playbook、決策軌跡、獨立審查前不放行的關卡、交接給新 subagent，以及證據分級。
+- [google-research/harness2](https://github.com/google-research/harness2)（Apache-2.0），版本 `1cfe254`：solid-loop 的放置判斷、最便宜機制的順序，以及沒有前後對照就不寫成教訓。
+- [mattpocock/skills](https://github.com/mattpocock/skills)（MIT）：grilling、domain-modeling、diff review、prototype playbook，以及 feature playbook 的介面檢查。
+- HumanLayer 的 [show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me)（MIT）：`answering` 的呈現方式。
+- [oh-my-pi](https://github.com/can1357/oh-my-pi)：Time Traveling Stream Rules。
+
+移植來的檔案在各自的頁尾註明出處。
