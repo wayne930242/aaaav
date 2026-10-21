@@ -14,12 +14,12 @@ aaaav            core loop · principles · playbooks: autonomous-run, pause, pi
 ├─ coding        bug-fix · feature · refactoring · perf · prototype  (+ Mini SDD)
 ├─ writing       draft · tighten · comments
 └─ solid-loop    apply-friction · author-skill · bootstrap
-shared           grilling · domain-modeling · human-feedback
+shared           grilling · domain-modeling · human-feedback · agent-terse
 ```
 
 - **`aaaav`** holds what is true for every task type: restate the task, pick the entry's playbook and copy its steps into `todo`, state a `Reality anchor:` before the first change, work in small increments deleting before adding, verify against the anchor, and record friction notes. The Reflexive pass hands friction notes to `solid-loop`. `PRINCIPLES.md` names the principles playbooks cite and the user can steer with. The lifecycle playbooks cover unattended runs, clean pauses, and picking up a prior run.
 - **Entry skills** each name the anchor for their task type and index their playbooks. A playbook has an ownership line, numbered steps, and a `Reply:` line that sets what the final report contains.
-- **Shared skills** are called by entries: `grilling` for user-owned decisions, `domain-modeling` for terms and ADRs, `human-feedback` for reactions to working output.
+- **Shared skills** are called by entries: `grilling` for user-owned decisions, `domain-modeling` for terms and ADRs, `human-feedback` for reactions to working output, `agent-terse` for text only agents read: briefs, reports, and agent messages.
 
 ## Extensions
 
@@ -55,6 +55,7 @@ uv run --with pytest pytest -q          # validators and the pi extensions (need
 - [pstack](https://github.com/backnotprop/pstack) by Lauren Tan (MIT), mirror revision `e44668c` of [cursor/plugins](https://github.com/cursor/plugins/tree/main/pstack), and its port [pstack-claude](https://github.com/michael-denyer/pstack-claude) by Michael Denyer (MIT): task-type playbooks, named principles, the lifecycle playbooks, the decision trail, the closed review gate, fresh-subagent hand-off, and evidence grades.
 - [google-research/harness2](https://github.com/google-research/harness2) (Apache-2.0), revision `1cfe254`: solid-loop's placement test, cheapest-mechanism order, and declining a lesson without a before/after contrast.
 - [mattpocock/skills](https://github.com/mattpocock/skills) (MIT): grilling, domain-modeling, the diff review, the prototype playbook, and the feature playbook's interface checks.
+- [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) (Apache-2.0), revision `bad48a0`: the terse voice in `agent-terse`.
 - HumanLayer's [show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me) (MIT): the views in `answering`.
 - [oh-my-pi](https://github.com/can1357/oh-my-pi): Time Traveling Stream Rules.
 

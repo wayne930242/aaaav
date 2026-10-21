@@ -29,7 +29,7 @@ Size the anchor to the change's actual reach and pick one method: an executable 
 
 Work in the smallest useful increments through the project's native practices, deleting before adding (**Subtract before you add**).
 
-Give follow-up work (a fix round, a retry, the next item) to a fresh subagent carrying the original brief, every later directive, and the prior report and branch, because a resumed chain silently drops directives; resume an existing subagent only for state it alone holds, such as uncommitted changes or a running process. Read each subagent's output and write its summary yourself.
+Give follow-up work (a fix round, a retry, the next item) to a fresh subagent carrying the original brief, every later directive, and the prior report and branch, because a resumed chain silently drops directives; resume an existing subagent only for state it alone holds, such as uncommitted changes or a running process. Write briefs, follow-ups, and messages to agents by [agent-terse](../agent-terse/SKILL.md); read each subagent's output and write its summary yourself.
 
 Report problems outside the contract as follow-ups rather than fixing them in this change, because each extra fix reopens review on code the round never meant to touch.
 

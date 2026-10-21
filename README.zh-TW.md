@@ -14,12 +14,12 @@ aaaav            核心循環 · 原則 · playbook：autonomous-run、pause、p
 ├─ coding        bug-fix · feature · refactoring · perf · prototype（+ Mini SDD）
 ├─ writing       draft · tighten · comments
 └─ solid-loop    apply-friction · author-skill · bootstrap
-共用             grilling · domain-modeling · human-feedback
+共用             grilling · domain-modeling · human-feedback · agent-terse
 ```
 
 - **`aaaav`** 放每一種任務都成立的做法：重述任務、選入口的 playbook 並把步驟抄進 `todo`、第一筆修改前寫出 `Reality anchor:`、以小步前進且先刪後加、依 anchor 驗證，並記下 friction note。Reflexive pass 會把 friction note 交給 `solid-loop`。`PRINCIPLES.md` 列出 playbook 引用的原則，使用者也可以用這些名稱中途修正方向。三本生命週期 playbook 處理無人看管的執行、乾淨的暫停，以及接手前一輪的工作。
 - **入口 skill** 各自寫出這類任務的 anchor，並列出自己的 playbook。每本 playbook 先用一句話說明它負責什麼，接著是編號步驟，最後一行 `Reply:` 規定回報要包含什麼。
-- **共用 skill** 由入口呼叫：`grilling` 處理使用者要做的決定，`domain-modeling` 處理術語和 ADR，`human-feedback` 處理對成品的反應。
+- **共用 skill** 由入口呼叫：`grilling` 處理使用者要做的決定，`domain-modeling` 處理術語和 ADR，`human-feedback` 處理對成品的反應，`agent-terse` 處理只給 agent 讀的文字：任務 brief、回報、agent 之間的訊息。
 
 ## Extension
 
@@ -55,6 +55,7 @@ uv run --with pytest pytest -q          # 驗證器與 pi extension 的測試（
 - Lauren Tan 的 [pstack](https://github.com/backnotprop/pstack)（MIT），鏡像 repo 的版本 `e44668c`，上游是 [cursor/plugins](https://github.com/cursor/plugins/tree/main/pstack)；以及 Michael Denyer 的移植版 [pstack-claude](https://github.com/michael-denyer/pstack-claude)（MIT）：依任務類型分的 playbook、具名原則、生命週期 playbook、決策軌跡、獨立審查前不放行的關卡、交接給新 subagent，以及證據分級。
 - [google-research/harness2](https://github.com/google-research/harness2)（Apache-2.0），版本 `1cfe254`：solid-loop 的放置判斷、最便宜機制的順序，以及沒有前後對照就不寫成教訓。
 - [mattpocock/skills](https://github.com/mattpocock/skills)（MIT）：grilling、domain-modeling、diff review、prototype playbook，以及 feature playbook 的介面檢查。
+- [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)（Apache-2.0），revision `bad48a0`：`agent-terse` 的精簡寫法。
 - HumanLayer 的 [show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me)（MIT）：`answering` 的呈現方式。
 - [oh-my-pi](https://github.com/can1357/oh-my-pi)：Time Traveling Stream Rules。
 
