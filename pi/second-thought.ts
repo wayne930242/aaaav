@@ -100,7 +100,7 @@ export function message(verdict: Verdict, found: string[], recheck: boolean): st
 		`Second thought (Jev, advisory): done ${verdict.done.toFixed(2)}, review ${verdict.review}, ` +
 		`quality ${verdict.quality.toFixed(2)}/3; ${found.join("; ")}.` +
 		(recheck ? " Recheck your evidence; continue only if it fails." : "") +
-		" No reply needed. Clear finished or stale todos."
+		" No reply needed. Clear finished or stale todos; continue any unfinished work."
 	);
 }
 
