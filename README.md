@@ -33,6 +33,8 @@ shared           grilling · domain-modeling · human-feedback · agent-terse
 
 ## Install
 
+Install the npm package `pi-aaaav`; it is the recommended way to use aaaav:
+
 ```bash
 pi install npm:pi-aaaav
 ```

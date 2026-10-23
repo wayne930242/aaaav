@@ -33,6 +33,8 @@ aaaav            核心循環 · 原則 · playbook：autonomous-run、pause、p
 
 ## 安裝
 
+建議安裝 npm 套件 `pi-aaaav` 來使用 aaaav：
+
 ```bash
 pi install npm:pi-aaaav
 ```
