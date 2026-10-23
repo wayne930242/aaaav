@@ -85,9 +85,9 @@ export function readVerdict(answers: Answers): Verdict | undefined {
 export function concerns(verdict: Verdict): string[] {
 	const found: string[] = [];
 	if (verdict.checkpoint < THRESHOLDS.checkpointBelow) return found;
-	if (verdict.done < THRESHOLDS.doneBelow) found.push("it does not read your reply as showing the request met");
-	if (verdict.review === THRESHOLDS.reviewTier) found.push("it rates the change as needing a full independent review before merge");
-	if (verdict.quality < THRESHOLDS.qualityBelow) found.push("it rates the result below what the request asks");
+	if (verdict.done < THRESHOLDS.doneBelow) found.push("request not shown met");
+	if (verdict.review === THRESHOLDS.reviewTier) found.push("needs full independent review");
+	if (verdict.quality < THRESHOLDS.qualityBelow) found.push("result below the request");
 	return found;
 }
 
@@ -97,12 +97,10 @@ export function needsRecheck(verdict: Verdict): boolean {
 
 export function message(verdict: Verdict, found: string[], recheck: boolean): string {
 	return (
-		`Second thought (Jev, advisory): done ${verdict.done.toFixed(2)}, review ${verdict.review} ` +
-		`(${verdict.reviewProbability.toFixed(2)}), quality ${verdict.quality.toFixed(2)}/3. ` +
-		`Jev says ${found.join("; ")}.` +
-		(recheck
-			? " Recheck your evidence against the work this run took on. If it holds, say so in one line and finish; otherwise continue the work."
-			: "")
+		`Second thought (Jev, advisory): done ${verdict.done.toFixed(2)}, review ${verdict.review}, ` +
+		`quality ${verdict.quality.toFixed(2)}/3; ${found.join("; ")}.` +
+		(recheck ? " Recheck your evidence; continue only if it fails." : "") +
+		" No reply needed. Clear finished or stale todos."
 	);
 }
 
