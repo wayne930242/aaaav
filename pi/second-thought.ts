@@ -7,7 +7,9 @@
  * A run that arranged a wake (a monitor, a loop, a subagent) is waiting, not finished,
  * and is not judged. Jev also says whether the reply is a
  * checkpoint, a point that hands work back to the user; a reply that only acknowledges,
- * reports progress, or waits gets no reminder. A wrong review tier or low quality gets one
+ * reports progress, or waits gets no reminder. A wake run is asked a stricter checkpoint
+ * question, since with the general one Jev counts a reply to a routine liveness or health
+ * check as handing work back. A wrong review tier or low quality gets one
  * advisory continuation per run; a low done score is only shown. The agent is never
  * blocked. Only the request, the trigger, the wake message, and the final reply are sent.
  * A subagent session registers nothing: the agent that spawned it judges its result.
@@ -62,6 +64,18 @@ export const QUESTIONS = {
 			"acceptable: meets the request",
 			"strong: meets it with direct evidence and no excess",
 		],
+	},
+};
+
+// Replayed on the 26 wake-run advisories of one long session, this question let through 1 of
+// the 21 status or liveness replies instead of all 21, and 3 of the 5 delivered results.
+export const WAKE_CHECKPOINT = {
+	type: "bool" as const,
+	instructions:
+		"Is `reply` a point where the agent hands work back to the user? `trigger` is `user` when the user's message started this run and `wake` when an automated message (a monitor, a loop, another agent) did; `wake` is that message. A reply to a routine check that `wake` asked for is not a checkpoint.",
+	criteria: {
+		true: "the reply delivers a finished result or artifact, reports the user's request finished or blocked, or asks the user to decide",
+		false: "the reply acknowledges a message, reports the status, health, load, or progress of work that is still running, or says the agent is waiting on something",
 	},
 };
 
@@ -194,8 +208,8 @@ export default function (pi: ExtensionAPI) {
 		asked = true;
 		const record = (data: Record<string, unknown>) => ({ type: "custom" as const, customType: ENTRY_TYPE, data });
 		const jev = ctx.modelRegistry.findOfType("classifier", "typesafe", "jev-latest");
-		// hasConfiguredAuth is typed for chat models but reads only `provider`, which a classifier has too.
 		type AuthModel = Parameters<typeof ctx.modelRegistry.hasConfiguredAuth>[0];
+		// SAFETY: hasConfiguredAuth is typed for chat models but reads only `provider`, which a classifier has too.
 		if (!jev || !ctx.modelRegistry.hasConfiguredAuth(jev as unknown as AuthModel)) return;
 		let verdict: Verdict | undefined;
 		let reason = "";
@@ -204,7 +218,7 @@ export default function (pi: ExtensionAPI) {
 				jev,
 				{
 					state: { request: request.slice(0, REQUEST_CHARS), trigger, wake: wake.slice(0, WAKE_CHARS), reply: reply.slice(-REPLY_CHARS) },
-					questions: QUESTIONS,
+					questions: trigger === "wake" ? { ...QUESTIONS, checkpoint: WAKE_CHECKPOINT } : QUESTIONS,
 				},
 				{ signal: AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), ...(ctx.signal ? [ctx.signal] : [])]) },
 			);

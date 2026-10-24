@@ -33,7 +33,7 @@ register({
   registerTool: (tool) => { tools[tool.name] = tool; },
 });
 const classifyPlan = JSON.parse(classifyJson);
-const out = { results: [], classifyCalls: [], notices: [] };
+const out = { results: [], classifyCalls: [], checkpointQuestions: [], notices: [] };
 const ctx = {
   cwd,
   ui: { notify: (message, level) => out.notices.push({ step: out.results.length, message, level }) },
@@ -46,6 +46,7 @@ const ctx = {
     hasConfiguredAuth: () => classifyPlan !== "no-auth",
     classify: async (_model, context) => {
       out.classifyCalls.push(context.state);
+      out.checkpointQuestions.push(context.questions.checkpoint);
       if (classifyPlan === "throw") throw new Error("network down");
       return classifyPlan;
     },
@@ -307,6 +308,17 @@ class TestSecondThought(ExtensionCase):
                  tool_call("bash"), assistant("Pinned."), custom("note", "aaaav-second-thought"), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "Monitor #2 done: if on npm, pin it.", "reply": "Pinned."}])
+
+    def test_a_wake_run_asks_whether_the_reply_only_answers_a_routine_check(self):
+        def custom(text: str) -> dict:
+            return {"event": "message_end", "payload": {"message": {"role": "custom", "customType": "pi-loop-monitor", "content": text}}}
+        steps = [user_start("ship it"), tool_call("bash"), assistant("Shipped."), SETTLE, SETTLED,
+                 custom("Loop #3 fired. Check worker liveness."), tool_call("bash"), assistant("Worker healthy, load 4.5."), SETTLE]
+        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
+        user_question, wake_question = out["checkpointQuestions"]
+        self.assertNotIn("routine check", user_question["instructions"])
+        self.assertIn("routine check", wake_question["instructions"])
+        self.assertIn("status, health, load, or progress of work that is still running", wake_question["criteria"]["false"])
 
     def test_a_reply_that_is_not_a_checkpoint_gets_no_reminder(self):
         result = self.run_turn(answers(0.02, "full", 0.5, checkpoint=0.1))["results"][3]
