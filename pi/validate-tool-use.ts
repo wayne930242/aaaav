@@ -1,23 +1,18 @@
 /**
- * pi extension: runs hooks/validate_tool_use.py after write and edit tool
- * results and appends its suggestions to the model-visible result content.
+ * pi extension: validates the file after each write and edit tool result and
+ * appends the suggestions to the model-visible result content. The checks run
+ * in-process (pi/support/validators.ts), so no Python is needed on any platform.
  */
 
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-const HOOK_SCRIPT = fileURLToPath(new URL("../hooks/validate_tool_use.py", import.meta.url));
+import { validateFile } from "./support/validators.ts";
 
 function validate(filePath: string, cwd: string): string | undefined {
-	const payload = JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath }, cwd });
-	const proc = spawnSync("python3", [HOOK_SCRIPT], { input: payload, encoding: "utf-8", timeout: 15_000 });
-	if (proc.error || proc.status !== 0) {
-		const reason = proc.error?.message || proc.stderr.trim() || `exit ${proc.status}`;
-		return `⚠ [aaaav] Validator did not run: ${reason}`;
+	try {
+		return validateFile(filePath, cwd);
+	} catch (error) {
+		return `⚠ [aaaav] Validator did not run: ${error instanceof Error ? error.message : String(error)}`;
 	}
-	if (!proc.stdout.trim()) return undefined;
-	return JSON.parse(proc.stdout).additionalContext;
 }
 
 export default function (pi: ExtensionAPI) {
