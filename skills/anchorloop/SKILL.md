@@ -1,6 +1,6 @@
 ---
 name: anchorloop
-description: Use when a task runs while the user is away, is paused, or picks up a prior run's work (我要睡了, 跑到完成, 先暫停, 接手昨天的), and as the shared loop every entry skill runs.
+description: Use when a task fits no entry skill, and as the shared loop every entry skill runs; its playbooks cover unattended runs, pauses, and resuming a prior run.
 ---
 
 # Anchor Loop
