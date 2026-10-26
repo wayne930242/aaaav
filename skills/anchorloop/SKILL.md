@@ -1,6 +1,6 @@
 ---
 name: anchorloop
-description: Use when a task fits no entry skill, and as the shared loop every entry skill runs; its playbooks cover unattended runs, pauses, and resuming a prior run.
+description: Use when doing loop work (change, check, iterate) that no skill was named for, especially coding; every entry skill runs this loop, and its playbooks cover unattended runs, pauses, and resuming a prior run.
 ---
 
 # Anchor Loop
