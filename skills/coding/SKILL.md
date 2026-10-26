@@ -5,7 +5,7 @@ description: Use when changing source code or its tests, such as fixing a bug, a
 
 # Coding
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md) with one of the playbooks below. Return to Align when user intent or observable behavior changes.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md) with one of the playbooks below. Return to Align when user intent or observable behavior changes.
 
 ## Classify
 

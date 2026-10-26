@@ -1,9 +1,9 @@
 ---
-name: aaaav
+name: anchorloop
 description: Use when a task runs while the user is away, is paused, or picks up a prior run's work (我要睡了, 跑到完成, 先暫停, 接手昨天的), and as the shared loop every entry skill runs.
 ---
 
-# AAAAV Loop
+# Anchor Loop
 
 Every entry skill (`answering`, `investigating`, `inspecting`, `coding`, `writing`, `solid-loop`) runs this loop and supplies the steps through one of its playbooks. The target project's instructions and an exact project skill govern where they speak.
 
@@ -21,7 +21,7 @@ Before the first change, state:
 
     Reality anchor: <the exact check that observes the result, and its checkpoint>
 
-The aaaav extension holds `write` and `edit` outside `scratch/` and `docs/specs/` until this line appears after the user's latest message.
+The anchorloop extension holds `write` and `edit` outside `scratch/` and `docs/specs/` until this line appears after the user's latest message.
 
 Size the anchor to the change's actual reach and pick one method: an executable check, a user operation, human judgment, or a focused review. An anchor assigned by a coordinator governs. Pick a review anchor when the change touches a shared contract, authorization or permission data, a migration, or security, or when the Jev second thought rates its review `full`; other changes rest on their check and the author's own read of the diff. A review anchor names the realistic use it judges against and blocks on P0 and P1 findings only, recording lower ones as follow-ups; after fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is normally once, after the last increment.
 
@@ -47,7 +47,7 @@ Keep them in `scratch/friction.md` unless the entry names another home.
 
 ### Decision Trail
 
-A run the user reviews after stepping away records one row per fork, completed unit, pivot, or blocker in `scratch/decisions-<task-slug>.tsv` with the `aaaav_decision` tool. Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads its last rows, then records a `start` row with its run id. Before handing back, check every row against what the run actually did and build the report from the trail.
+A run the user reviews after stepping away records one row per fork, completed unit, pivot, or blocker in `scratch/decisions-<task-slug>.tsv` with the `anchorloop_decision` tool. Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads its last rows, then records a `start` row with its run id. Before handing back, check every row against what the run actually did and build the report from the trail.
 
 ## Verify
 

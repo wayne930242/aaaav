@@ -1,4 +1,4 @@
-"""Loads the aaaav loop extensions with a stub pi API and replays events against them."""
+"""Loads the anchorloop loop extensions with a stub pi API and replays events against them."""
 
 import json
 import os
@@ -167,7 +167,7 @@ class TestAnchorGate(ExtensionCase):
             tool_call("edit", "legacy/page.HTM"),
             tool_call("write", "scratch/friction.json"),
             tool_call("edit", "docs/specs/2026-10-21-x/design.html"),
-            tool_call("write", str(Path(tempfile.gettempdir()) / "aaaav-gate-outside" / "page.html")),
+            tool_call("write", str(Path(tempfile.gettempdir()) / "anchorloop-gate-outside" / "page.html")),
             tool_call("bash"),
         ])
         self.assertEqual(out["notices"], [])
@@ -205,7 +205,7 @@ class TestDecisionTool(ExtensionCase):
 
     def test_first_row_writes_the_header_and_cells_stay_single_line_and_formula_safe(self):
         self.replay([
-            {"tool": "aaaav_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "a\tb\nc",
+            {"tool": "anchorloop_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "a\tb\nc",
                                                   "why": "=HYPERLINK(1)", "evidence": "-rf", "result": "@x"}},
         ])
         rows = self.rows()
@@ -214,9 +214,9 @@ class TestDecisionTool(ExtensionCase):
 
     def test_start_row_names_the_run_and_the_rows_before_it(self):
         self.replay([
-            {"tool": "aaaav_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "first", "why": "w",
+            {"tool": "anchorloop_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "first", "why": "w",
                                                   "evidence": "abc123", "result": "open"}},
-            {"tool": "aaaav_decision", "params": {"log": "scratch/decisions-t.tsv", "start": "worker-2"}},
+            {"tool": "anchorloop_decision", "params": {"log": "scratch/decisions-t.tsv", "start": "worker-2"}},
         ])
         last = self.rows()[-1]
         self.assertEqual(last[1], "start")
@@ -224,13 +224,13 @@ class TestDecisionTool(ExtensionCase):
         self.assertEqual(last[3:], ["worker-2", "open"])
 
     def test_a_log_outside_the_scratch_trail_is_refused(self):
-        out = self.replay([{"tool": "aaaav_decision", "params": {"log": "src/app.py", "decision": "d", "why": "w",
+        out = self.replay([{"tool": "anchorloop_decision", "params": {"log": "src/app.py", "decision": "d", "why": "w",
                                                                    "evidence": "e", "result": "r"}}])
         self.assertIn("scratch/decisions-", out["results"][0]["error"])
         self.assertFalse((self.cwd / "src/app.py").exists())
 
     def test_missing_cells_fail_without_writing(self):
-        out = self.replay([{"tool": "aaaav_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "only"}}])
+        out = self.replay([{"tool": "anchorloop_decision", "params": {"log": "scratch/decisions-t.tsv", "decision": "only"}}])
         self.assertIn("all required", out["results"][0]["error"])
         self.assertFalse((self.cwd / "scratch/decisions-t.tsv").exists())
 
@@ -305,7 +305,7 @@ class TestSecondThought(ExtensionCase):
             return {"event": "message_end", "payload": {"message": {"role": "custom", "customType": kind, "content": text}}}
         steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE, SETTLED,
                  custom("Monitor #2 started"), custom("Monitor #2 done: if on npm, pin it."),
-                 tool_call("bash"), assistant("Pinned."), custom("note", "aaaav-second-thought"), SETTLE]
+                 tool_call("bash"), assistant("Pinned."), custom("note", "anchorloop-second-thought"), SETTLE]
         out = self.replay(steps, classify=answers(0.9, "none", 2.9))
         self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "Monitor #2 done: if on npm, pin it.", "reply": "Pinned."}])
 

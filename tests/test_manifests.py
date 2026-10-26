@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 class TestPiManifest(unittest.TestCase):
     def test_pi_manifest(self):
         data = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["name"], "pi-aaaav")
+        self.assertEqual(data["name"], "pi-anchorloop")
         self.assertIn("pi-package", data["keywords"])
         for path in data["pi"]["extensions"] + data["pi"]["skills"]:
             self.assertTrue((REPO_ROOT / path).exists(), f"pi resource {path} must exist")

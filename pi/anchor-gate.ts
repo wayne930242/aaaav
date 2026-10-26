@@ -14,7 +14,7 @@ const EXEMPT_ROOTS = [tmpdir(), "/tmp", "/var/folders"];
 const EXEMPT_EXTENSIONS = [".md", ".txt", ".html", ".htm"];
 
 export const WARNING =
-	"aaaav anchor gate: a change ran before the reply stated " +
+	"anchorloop anchor gate: a change ran before the reply stated " +
 	"`Reality anchor: <the exact check that observes the result, and its checkpoint>`.";
 
 type Block = { type: string; text?: string };

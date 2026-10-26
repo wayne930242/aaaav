@@ -5,7 +5,7 @@ description: Use when explaining a concept or how something works, comparing tec
 
 # Answering
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is that every material claim carries its source and its evidence grade as `investigating` defines them; gather missing evidence through `investigating` first.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md). The anchor is that every material claim carries its source and its evidence grade as `investigating` defines them; gather missing evidence through `investigating` first.
 
 Keep prose brief and state uncertainty where it lives. Show the shape beside the sentence it supports, with the smallest view that makes the point: a call tree or file tree for structure, pseudocode for logic, `A → B: message` lines for interaction, a table for options against criteria.
 

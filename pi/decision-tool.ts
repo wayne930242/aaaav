@@ -1,5 +1,5 @@
 /**
- * pi extension: the `aaaav_decision` tool appends single-line rows to a
+ * pi extension: the `anchorloop_decision` tool appends single-line rows to a
  * decision trail TSV. Adapted from pstack's show-me-your-work log.sh
  * (MIT, (c) 2026 Lauren Tan).
  */
@@ -53,7 +53,7 @@ type Params = { log: string; start?: string; decision?: string; why?: string; ev
 
 export default function (pi: ExtensionAPI) {
 	pi.registerTool({
-		name: "aaaav_decision",
+		name: "anchorloop_decision",
 		label: "Decision trail",
 		description:
 			"Append one row to a decision trail TSV (scratch/decisions-<task-slug>.tsv): a fork chosen, a unit completed, a pivot, or a blocker. " +

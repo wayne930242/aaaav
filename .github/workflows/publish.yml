@@ -24,8 +24,8 @@ jobs:
         run: |
           version="$(node -p 'require("./package.json").version')"
           test "v$version" = "$GITHUB_REF_NAME"
-          if npm view "pi-aaaav@$version" version >/dev/null 2>&1; then
-            echo "pi-aaaav@$version is already published"
+          if npm view "pi-anchorloop@$version" version >/dev/null 2>&1; then
+            echo "pi-anchorloop@$version is already published"
           else
             npm publish --access public
           fi

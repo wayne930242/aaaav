@@ -5,7 +5,7 @@ description: Use when researching questions, diagnosing root causes without fixi
 
 # Investigating
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is the exact question and its completion boundary: answered, or the missing evidence named precisely.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md). The anchor is the exact question and its completion boundary: answered, or the missing evidence named precisely.
 
 1. Gather evidence through the playbook below that fits the question.
 2. Cross-check material claims and resolve source conflicts.

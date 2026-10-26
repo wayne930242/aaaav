@@ -40,7 +40,7 @@ CORE_RULES = [
     "Traditional Chinese communication",
     "English instructions and prompts",
     "Direct statement of expected behavior without defensive phrasing",
-    "AAAAV reality anchor named before first production edit",
+    "Anchorloop reality anchor named before first production edit",
 ]
 
 # Standard verification result states

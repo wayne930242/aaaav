@@ -5,13 +5,13 @@ description: Use when creating, editing, or auditing agent skills and instructio
 
 # Solid Loop
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is `uv run python hooks/validate_all.py .` or the project's own validator, clean, and every edited section passing the no-op test.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md). The anchor is `uv run python hooks/validate_all.py .` or the project's own validator, clean, and every edited section passing the no-op test.
 
 The root virtue is **predictability**: each instruction sends the next run straight to the work, with no detour and no unneeded read.
 
 ## Placement
 
-Put each fact where it stays true. One that holds for every task type goes to the `aaaav` core; one that holds for one task type goes to its entry skill or playbook; one that holds for one project goes to that project's `AGENTS.md` or `CLAUDE.md`. A multi-step procedure no skill owns becomes a playbook, or a skill when no entry fits.
+Put each fact where it stays true. One that holds for every task type goes to the `anchorloop` core; one that holds for one task type goes to its entry skill or playbook; one that holds for one project goes to that project's `AGENTS.md` or `CLAUDE.md`. A multi-step procedure no skill owns becomes a playbook, or a skill when no entry fits.
 
 ## Mechanism
 

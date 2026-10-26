@@ -5,7 +5,7 @@ description: Use when writing or revising documentation, a README, an article, a
 
 # Writing
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is a reader without the conversation's context: hand the text to a fresh subagent and check it can say what the text asks of its reader. Comment-only work also keeps the project's tests green.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md). The anchor is a reader without the conversation's context: hand the text to a fresh subagent and check it can say what the text asks of its reader. Comment-only work also keeps the project's tests green.
 
 Short declarative sentences; each claim carries its evidence or reads as an estimate. For Traditional Chinese articles, load `writing-in-weihung-voice` when it exists.
 

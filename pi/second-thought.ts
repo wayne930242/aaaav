@@ -17,7 +17,7 @@
 
 import { type ExtensionAPI, parseSkillBlock } from "@earendil-works/pi-coding-agent";
 
-export const ENTRY_TYPE = "aaaav-second-thought";
+export const ENTRY_TYPE = "anchorloop-second-thought";
 const WORK_TOOLS = new Set(["write", "edit", "bash"]);
 const WAIT_TOOLS = new Set(["MonitorCreate", "LoopCreate", "goal_wait", "subagent", "subagent_resume", "subagent_send"]);
 const REQUEST_CHARS = 1500;

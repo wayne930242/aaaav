@@ -399,5 +399,5 @@ export function validateFile(filePath: string, cwd: string): string | undefined 
 
 	const rel = relative(base, target);
 	const shown = rel.startsWith("..") || isAbsolute(rel) ? target : rel;
-	return `⚠ [aaaav] Validation suggestions for ${shown}:\n${warnings.map((warning) => `  - ${warning}`).join("\n")}`;
+	return `⚠ [anchorloop] Validation suggestions for ${shown}:\n${warnings.map((warning) => `  - ${warning}`).join("\n")}`;
 }

@@ -5,7 +5,7 @@ description: Use when auditing or reviewing a specific target, diff, commit, or 
 
 # Inspecting
 
-Run the loop in [../aaaav/SKILL.md](../aaaav/SKILL.md). The anchor is that every scoped item has a verdict and its evidence.
+Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md). The anchor is that every scoped item has a verdict and its evidence.
 
 When a reviewer role contract is present, it governs scope, evidence, and report format; add only the Standards and Spec axes.
 
