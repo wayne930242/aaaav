@@ -36,7 +36,7 @@ Approved from: <the user reply that approved it, empty while proposed>
 
 Choose the smallest approach that fits the approved spec and architecture. Follow the matching playbook's design steps ([feature](playbooks/feature.md) for interfaces and seams, [prototype](playbooks/prototype.md) when a named question is cheaper to settle by experiment) and the project's exact skill.
 
-The file holds the chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor. Friction notes recorded during Act go under `## Friction Notes`.
+The file holds the chosen approach; interfaces and data flow affected; existing precedent; decisions, trade-offs, and risks; the method selected inside the reality anchor.
 
 **Complete when:** implementation invents no product behavior or architecture.
 
@@ -54,7 +54,7 @@ Review the diff against project standards, the approved spec, and the confirmed 
 - **fail**: The anchor observed a deviation from the spec or an error.
 - **unknown**: No anchor exercised the requirement in this run.
 
-Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. When friction notes exist, include a Reflexive section listing each with its classification (`misdirection` or `gap`) and its action.
+Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. When the loop book holds friction, include a Reflexive section listing each entry with its class (`misdirection`, `gap`, or `resolved`) and its action.
 
 ## Updates
 
