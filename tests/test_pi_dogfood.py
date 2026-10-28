@@ -108,6 +108,9 @@ class TestAnchorChains(BookCase):
         self.assertEqual(self.exits("set -o pipefail; pytest -q || true", 0)[-1], "unknown")
         self.assertEqual(self.exits("set -o pipefail; pytest -q | tail; true", 0)[-1], "unknown")
         self.assertEqual(self.exits("pytest -q && git commit -m x", 1)[-1], 1)
+        self.assertEqual(self.exits("! pytest -q", 0)[-1], "unknown")
+        self.assertEqual(self.exits("true || pytest -q", 0)[-1], "unknown")
+        self.assertEqual(self.exits("pytest -q & wait", 0)[-1], "unknown")
 
 
 class TestCloseOutput(BookCase):

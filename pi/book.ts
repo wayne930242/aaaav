@@ -122,12 +122,14 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 export function anchorExit(command: string, anchor: string, exit: number | null): number | "unknown" {
 	if (exit === null) return "unknown";
 	const at = command.indexOf(anchor);
-	const rest = at < 0 ? "" : command.slice(at + anchor.length);
+	// `! anchor` inverts the code and `x || anchor` may never run it.
+	if (at < 0 || /(!|\|\|)\s*$/.test(command.slice(0, at))) return "unknown";
+	const rest = command.slice(at + anchor.length);
 	const pipefail = /^\s*set\s+-o\s+pipefail\b/.test(command);
 	let chained = false;
 	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe
 	// straight after the anchor unless pipefail is set.
-	for (const [separator] of rest.matchAll(/&&|\|\||\||;|\n/g)) {
+	for (const [separator] of rest.matchAll(/&&|\|\||\||(?<![<>&])&(?![&>])|;|\n/g)) {
 		if (separator === "&&") chained = true;
 		else if (separator === "|") {
 			if (!chained && !pipefail) return "unknown";
@@ -411,7 +413,7 @@ export default function (pi: ExtensionAPI) {
 			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
-			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: exit ?? "unknown", last });
+			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
 		}
 		if (exit === 0 && /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.test(command) && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
