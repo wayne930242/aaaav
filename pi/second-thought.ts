@@ -1,38 +1,39 @@
 /**
- * pi extension: inside an open loop, asks Jev what the agent should do next and whether the
- * book's evidence covers the loop's intent. Jev sees only what the loop book holds: the kind,
- * intent, anchor, diff summary, verify state (stages, review rounds, child checks), and open
- * todo count. It runs when a run settles and the book gained an entry since the last judgment,
- * and at a `close` declaration. The main output is a next-stage suggestion; the advisory leads
- * with it and continues the run once, only when the suggestion is verify, review, or fix and the
- * book shows that stage missing after the last change. A run that arranged a wake (a monitor, a
- * loop, a subagent) is waiting, not finished, and is not judged. Outside a loop nothing runs.
- * A subagent session registers nothing: the agent that spawned it judges its result.
+ * pi extension: inside an open loop, asks Jev to check the phase machine's reading of the loop book. The
+ * program computes the next phase from the book's evidence; Jev sees the kind, intent, anchor, diff
+ * summary, phase (current, next, missing), verify state, open todos, tasks, and friction, and judges only
+ * whether the current phase's completion condition truly holds and whether to advance, go back, or ask
+ * the user. It runs when a run settles and the book gained an entry since the last judgment, and at a
+ * `close` declaration. The advisory is one line leading with `next → <phase>`; it continues the run once
+ * when Jev agrees to advance and the next phase is a verify, review, or fix. A run that arranged a wake
+ * (a monitor, a loop, a subagent) is waiting, not finished, and is not judged. Outside a loop nothing
+ * runs, nor in a `quick` loop, whose only prompt is the close reminder; a subagent session registers
+ * nothing, since the agent that spawned it judges its result.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	type Book,
+	allFriction,
 	childLines,
 	currentIntent,
 	currentKind,
 	diffAgainstBases,
 	diffText,
-	isBlocking,
+	guarded,
 	isOpenTask,
 	latestAnchor,
-	lastIndex,
-	openBook,
+	openLoop,
 	replayTodos,
 	reviewClearAfterLastAct,
 	reviewTrend,
-	reviews,
 	stagesDone,
 	TASK_LEGEND,
 	taskLines,
 	verifyAfterLastAct,
 } from "./support/book.ts";
 import { type Answers, classify } from "./support/jev.ts";
+import { computePhases } from "./support/phases.ts";
 import { isSubagent } from "./support/subagent.ts";
 
 export { isSubagent };
@@ -40,23 +41,31 @@ export { isSubagent };
 export const ENTRY_TYPE = "anchorloop-second-thought";
 const WAIT_TOOLS = new Set(["MonitorCreate", "LoopCreate", "goal_wait", "subagent", "subagent_resume", "subagent_send"]);
 
-export const THRESHOLDS = { doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
+export const THRESHOLDS = { completeBelow: 0.5, doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
 
-export const NEXT_STAGES = ["continue", "verify", "review", "fix", "close", "ask-user"] as const;
-export type Next = (typeof NEXT_STAGES)[number];
+export const MOVES = ["advance", "back", "ask-user"] as const;
+export type Move = (typeof MOVES)[number];
+
+/** The phases whose missing evidence the agent can supply by acting, so Jev's agreement continues the run. */
+const ACTIONABLE = new Set(["verify", "check", "review", "fix"]);
 
 export const QUESTIONS = {
-	next: {
+	move: {
 		type: "choice" as const,
 		instructions:
-			"What should the agent do next in this loop? `kind` is the loop kind, `intent` what it delivers, `anchor` the check that observes the result, `diff` what changed, `verify` the stages, check evidence, and reviews recorded so far, `todos` the open count, and `tasks` each work item with its own anchor, last exit code, and spec references.",
+			"The program computed `phase` from the loop book: the last complete phase, the next one, and what the next lacks. Given `kind`, `intent`, `anchor`, `diff`, `verify` (check evidence and reviews), `todos`, `tasks`, and `friction`, should the agent move on to the next phase, go back because the evidence of an earlier phase does not hold, or ask the user?",
 		criteria: {
-			continue: "work on the intent remains to be done",
-			verify: "the change was made or altered after the last check, or no check observed the anchor",
-			review: "the kind or the diff needs an independent review that is not recorded, or the last one predates the last change",
-			fix: "a recorded check or review shows a failure or a blocking finding that is not yet fixed",
-			close: "the verify evidence covers the intent, any needed review is clear, and no todo is open",
+			advance: "the recorded evidence supports the last complete phase and the next phase can proceed",
+			back: "evidence recorded for an earlier phase is wrong, stale, or contradicted by a later result",
 			"ask-user": "a decision or judgment that belongs to the user blocks progress",
+		},
+	},
+	complete: {
+		type: "bool" as const,
+		instructions: "Does the evidence in `diff`, `verify`, and `phase` show that the completion condition of the last complete phase (`phase` current) truly holds, beyond the program's mechanical check?",
+		criteria: {
+			true: "the evidence observably meets what the phase requires",
+			false: "the phase counts as complete on a mechanical signal, but its content is empty, stale, or off the intent",
 		},
 	},
 	done: {
@@ -88,15 +97,16 @@ export const QUESTIONS = {
 	},
 };
 
-export type Verdict = { next: Next; done: number; review: string; reviewProbability: number; quality: number };
+export type Verdict = { move: Move; complete: number; done: number; review: string; reviewProbability: number; quality: number };
 
 export function readVerdict(answers: Answers): Verdict | undefined {
-	const { next, done, review, quality } = answers;
-	if (next?.type !== "choice" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
-	if (!(NEXT_STAGES as readonly string[]).includes(next.choice ?? "")) return undefined;
+	const { move, complete, done, review, quality } = answers;
+	if (move?.type !== "choice" || complete?.type !== "bool" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
+	if (!(MOVES as readonly string[]).includes(move.choice ?? "")) return undefined;
 	const choice = review.choice ?? "";
 	return {
-		next: next.choice as Next,
+		move: move.choice as Move,
+		complete: complete.probability ?? 0,
 		done: done.probability ?? 0,
 		review: choice,
 		reviewProbability: review.probabilities?.[choice] ?? 0,
@@ -106,77 +116,76 @@ export function readVerdict(answers: Answers): Verdict | undefined {
 
 export type Snapshot = {
 	state: Record<string, string>;
-	/** The book facts that back the suggestion, in a few words. */
-	facts: string;
-	/** A review recorded after the last act with no blocking finding on it. */
+	/** The program's next phase and what it lacks, in a few words. */
+	next: string;
+	missing: string;
+	/** Advisory hints that are not phases, such as an unrecorded friction. */
+	hints: string[];
+	/** The last phase the book shows complete. */
+	current: string;
+	/** A review recorded after the last change with no blocking finding on it. */
 	reviewClear: boolean;
-	/** The stage the book shows missing after the last act, if any. */
-	missing: Next[];
 };
 
 export function snapshot(book: Book, ctx: { cwd: string; sessionManager: { getBranch(): unknown[] } }): Snapshot {
 	const { entries } = book;
 	const todos = replayTodos(ctx.sessionManager.getBranch());
 	const open = todos.filter(isOpenTask).length;
+	const phases = computePhases(book, { cwd: ctx.cwd, todos });
 	const check = verifyAfterLastAct(entries);
-	const rounds = reviews(entries);
-	const lastReview = rounds.at(-1);
-	const missing: Next[] = [];
-	if (!check) missing.push("verify");
-	if (lastIndex(entries, "review") <= lastIndex(entries, "act")) missing.push("review");
-	if (lastReview && isBlocking(lastReview) && lastIndex(entries, "act") < lastIndex(entries, "review")) missing.push("fix");
-	const facts = [
-		check ? `verify ${check.skip ? "skipped" : `exit ${check.exit ?? "unknown"}`} after the last change` : "no verify after the last change",
-		lastReview ? `review r${rounds.length} ${lastReview.blocking === true ? "blocking" : lastReview.blocking === false ? "clear" : "unknown"}` : "no review",
-		`${open} open todo${open === 1 ? "" : "s"}`,
-	].join(", ");
 	const verify = [
 		`stages: ${stagesDone(entries).join(", ") || "none"}`,
-		`last check: ${check ? `exit ${check.exit ?? "unknown"}${check.last ? ` — ${check.last}` : ""}` : "none after the last change"}`,
+		`last check: ${check ? `${check.declared ? `declared ${check.result}` : `exit ${check.exit ?? "unknown"}`}${check.last ? ` — ${check.last}` : ""}` : "none after the last change"}`,
 		`reviews: ${reviewTrend(entries)}`,
 		...childLines(entries).map((line) => `child ${line}`),
 	].join("; ");
+	const friction = allFriction(entries).map((item) => `${item.ref}: ${item.tried} → ${item.found} [${item.reflected ? item.class : "unreflected"}]`);
 	return {
 		state: {
 			kind: currentKind(entries) ?? "not declared",
 			intent: (currentIntent(entries) ?? "not declared").slice(0, 500),
 			anchor: (latestAnchor(entries) ?? "none").slice(0, 500),
 			diff: diffText(diffAgainstBases(entries)),
+			phase: `current: ${phases.current}; next: ${phases.next}${phases.missing ? `; missing: ${phases.missing}` : ""}${phases.skipped.length ? `; skipped: ${phases.skipped.join(", ")}` : ""}`.slice(0, 600),
 			verify: verify.slice(0, 1200),
 			todos: `${open} open of ${todos.length}`,
 			tasks: [`legend: ${TASK_LEGEND}`, ...taskLines(entries, todos, ctx.cwd)].join("\n").slice(0, 1500),
+			friction: (friction.join("\n") || "none").slice(0, 800),
 		},
-		facts,
+		next: phases.next,
+		missing: phases.missing,
+		hints: phases.hints,
+		current: phases.current,
 		reviewClear: reviewClearAfterLastAct(entries),
-		missing,
 	};
 }
 
-export function assess(verdict: Verdict, reviewClear: boolean): { found: string[]; notes: string[] } {
+export function assess(verdict: Verdict, snap: Snapshot): { found: string[]; notes: string[] } {
 	const found: string[] = [];
 	const notes: string[] = [];
+	if (verdict.complete < THRESHOLDS.completeBelow && snap.current !== "start") found.push(`${snap.current} not shown to be complete`);
 	if (verdict.done < THRESHOLDS.doneBelow) found.push("evidence not shown to cover the intent");
 	if (verdict.review === THRESHOLDS.reviewTier) {
-		if (reviewClear) notes.push("review rated full, but a review recorded after the last change found no blocking finding");
+		if (snap.reviewClear) notes.push("review rated full, but a review recorded after the last change found no blocking finding");
 		else found.push("needs full independent review");
 	}
 	if (verdict.quality < THRESHOLDS.qualityBelow) found.push("result below the intent");
 	return { found, notes };
 }
 
-/** The stage to continue the run with: the suggestion, only when the book shows it missing after the last act. */
+/** True when Jev agrees to advance and the next phase is one the agent can act on now. */
 export function continues(verdict: Verdict, snap: Snapshot): boolean {
-	return (verdict.next === "verify" || verdict.next === "review" || verdict.next === "fix") && snap.missing.includes(verdict.next);
+	return verdict.move === "advance" && ACTIONABLE.has(snap.next);
 }
 
-export function message(verdict: Verdict, snap: Snapshot, found: string[], notes: string[]): string {
-	const extra = [...found, ...notes];
+/** One line: the program's next phase and its gap, Jev's move and scores, and, away from close, the call to act. */
+export function message(verdict: Verdict, snap: Snapshot, found: string[], notes: string[], atClose = false): string {
+	const extra = [...found, ...notes, ...snap.hints];
 	return (
-		`Second thought (Jev, advisory): next → ${verdict.next} (${snap.facts}); ` +
-		`done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
+		`Second thought (Jev, advisory): next → ${snap.next}${snap.missing ? ` (missing: ${snap.missing})` : ""}; ` +
+		`${verdict.move}; complete ${verdict.complete.toFixed(2)}, done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
 		`${extra.length ? `; ${extra.join("; ")}` : ""}.` +
-		(continues(verdict, snap) ? ` The book shows ${verdict.next} missing: do it now, or say why it does not apply.` : "") +
-		" No reply needed."
+		(!atClose && continues(verdict, snap) ? ` Do ${snap.next} now, or say why it does not apply.` : "")
 	);
 }
 
@@ -184,13 +193,15 @@ export default function (pi: ExtensionAPI) {
 	if (isSubagent()) return;
 	let waiting = false;
 	let continued = false;
-	// Entries each open book held when it was last judged.
+	// Entries each open book held when it was last judged, and the advisory it last received.
 	const judged = new Map<string, number>();
+	const told = new Map<string, string>();
 	// A close deletes its book, so what Jev needs is read when the call starts.
 	const closing = new Map<string, Snapshot>();
 
 	pi.on("session_start", () => {
 		judged.clear();
+		told.clear();
 		closing.clear();
 	});
 
@@ -199,12 +210,15 @@ export default function (pi: ExtensionAPI) {
 		continued = false;
 	});
 
-	pi.on("tool_call", (event, ctx) => {
-		if (WAIT_TOOLS.has(event.toolName)) waiting = true;
-		if (event.toolName !== "anchorloop_stage" || (event.input as { stage?: unknown }).stage !== "close") return;
-		const book = openBook(ctx);
-		if (book) closing.set(event.toolCallId, snapshot(book, ctx));
-	});
+	pi.on(
+		"tool_call",
+		guarded((event, ctx) => {
+			if (WAIT_TOOLS.has(event.toolName)) waiting = true;
+			if (event.toolName !== "anchorloop_stage" || (event.input as { stage?: unknown }).stage !== "close") return;
+			const book = openLoop(ctx);
+			if (book && currentKind(book.entries) !== "quick") closing.set(event.toolCallId, snapshot(book, ctx));
+		}),
+	);
 
 	async function judge(ctx: Parameters<typeof classify>[0], snap: Snapshot) {
 		const { answers, reason } = await classify(ctx, snap.state, QUESTIONS);
@@ -212,39 +226,48 @@ export default function (pi: ExtensionAPI) {
 		return { verdict: answers ? readVerdict(answers) : undefined, reason };
 	}
 
-	pi.on("tool_result", async (event, ctx) => {
-		const snap = closing.get(event.toolCallId);
-		if (!snap) return;
-		closing.delete(event.toolCallId);
-		if (event.isError) return;
-		const judgment = await judge(ctx, snap);
-		if (!judgment?.verdict) return;
-		const { found, notes } = assess(judgment.verdict, snap.reviewClear);
-		pi.appendEntry(ENTRY_TYPE, { ...judgment.verdict, at: "close", concerns: found });
-		return { content: [...event.content, { type: "text" as const, text: message(judgment.verdict, snap, found, notes) }] };
-	});
+	pi.on(
+		"tool_result",
+		guarded(async (event, ctx) => {
+			const snap = closing.get(event.toolCallId);
+			if (!snap) return;
+			closing.delete(event.toolCallId);
+			if (event.isError) return;
+			const judgment = await judge(ctx, snap);
+			if (!judgment?.verdict) return;
+			const { found, notes } = assess(judgment.verdict, snap);
+			pi.appendEntry(ENTRY_TYPE, { ...judgment.verdict, at: "close", concerns: found });
+			return { content: [...event.content, { type: "text" as const, text: message(judgment.verdict, snap, found, notes, true) }] };
+		}),
+	);
 
-	pi.on("agent_before_settle", async (event, ctx) => {
-		if (waiting || event.outcome !== "completed") return;
-		const book = openBook(ctx);
-		if (!book) return;
-		const id = String(book.header.id);
-		if (book.entries.length <= (judged.get(id) ?? 0)) return;
-		judged.set(id, book.entries.length);
-		const snap = snapshot(book, ctx);
-		const judgment = await judge(ctx, snap);
-		if (!judgment) return;
-		const record = (data: Record<string, unknown>) => ({ type: "custom" as const, customType: ENTRY_TYPE, data });
-		if (!judgment.verdict) return { entries: [record({ verdict: "unknown", reason: judgment.reason })] };
-		const { found, notes } = assess(judgment.verdict, snap.reviewClear);
-		const proceed = !continued && continues(judgment.verdict, snap);
-		if (proceed) continued = true;
-		return {
-			entries: [
-				record({ ...judgment.verdict, concerns: found }),
-				{ type: "custom_message" as const, customType: ENTRY_TYPE, content: message(judgment.verdict, snap, found, notes), display: true },
-			],
-			...(proceed ? { continue: true } : {}),
-		};
-	});
+	pi.on(
+		"agent_before_settle",
+		guarded(async (event, ctx) => {
+			if (waiting || event.outcome !== "completed") return;
+			const book = openLoop(ctx);
+			// A quick loop has no prompts but the close reminder.
+			if (!book || currentKind(book.entries) === "quick") return;
+			const id = String(book.header.id);
+			if (book.entries.length <= (judged.get(id) ?? 0)) return;
+			judged.set(id, book.entries.length);
+			const snap = snapshot(book, ctx);
+			const judgment = await judge(ctx, snap);
+			if (!judgment) return;
+			const record = (data: Record<string, unknown>) => ({ type: "custom" as const, customType: ENTRY_TYPE, data });
+			// A later handler's boundary result replaces the entries an earlier one returned, so carry them along.
+			const earlier = event.entries ?? [];
+			if (!judgment.verdict) return { entries: [...earlier, record({ verdict: "unknown", reason: judgment.reason })] };
+			const { found, notes } = assess(judgment.verdict, snap);
+			const text = message(judgment.verdict, snap, found, notes);
+			if (told.get(id) === text) return;
+			told.set(id, text);
+			const proceed = !continued && continues(judgment.verdict, snap);
+			if (proceed) continued = true;
+			return {
+				entries: [...earlier, record({ ...judgment.verdict, concerns: found }), { type: "custom_message" as const, customType: ENTRY_TYPE, content: text, display: true }],
+				...(proceed ? { continue: true } : {}),
+			};
+		}),
+	);
 }

@@ -5,7 +5,7 @@
  * Each extension reads the book from disk, so no state is shared between extensions in memory.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
@@ -48,6 +48,19 @@ export function childId(env: NodeJS.ProcessEnv = process.env): string | undefine
 
 function safe(id: string): string {
 	return id.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+/** Runs an event handler so a book I/O failure never blocks the tool or the turn it observes. */
+export function guarded<Args extends unknown[], Result>(handler: (...args: Args) => Result): (...args: Args) => Result | undefined {
+	return (...args) => {
+		try {
+			const result = handler(...args);
+			if (result instanceof Promise) return result.catch(() => undefined) as Result;
+			return result;
+		} catch {
+			return undefined;
+		}
+	};
 }
 
 export function bookPath(who: Who, env: NodeJS.ProcessEnv = process.env): string {
@@ -95,6 +108,17 @@ export function openBook(who: Who, env: NodeJS.ProcessEnv = process.env): Book |
 	return parseBook(bookPath(who, env));
 }
 
+/** A subagent that closed its loop keeps its book for main; such a book is no longer an open loop. */
+export function isClosed(book: Book): boolean {
+	return book.entries.at(-1)?.stage === "close";
+}
+
+/** The open loop's book, or undefined when there is none or the book was closed. */
+export function openLoop(who: Who, env: NodeJS.ProcessEnv = process.env): Book | undefined {
+	const book = openBook(who, env);
+	return book && !isClosed(book) ? book : undefined;
+}
+
 function appendBytes(path: string, text: string): void {
 	const fd = openSync(path, "a");
 	try {
@@ -109,9 +133,11 @@ function appendBytes(path: string, text: string): void {
 export function createBook(who: Who, env: NodeJS.ProcessEnv = process.env): Book {
 	const path = bookPath(who, env);
 	mkdirSync(dirname(path), { recursive: true });
+	if (existsSync(path)) deleteBook(path);
 	const child = childId(env);
 	const header = {
-		id: basename(path, ".yml"),
+		// Unique per loop: the file name follows the session, so a reopened loop must not reuse an old id.
+		id: `${basename(path, ".yml")}-${randomUUID().slice(0, 8)}`,
 		owner: child ? env.PI_SUBAGENT_NAME || child : "main",
 		session: (child ? env.PI_SUBAGENT_SESSION : undefined) || who.sessionManager.getSessionFile?.() || null,
 		cwd: real(who.cwd),
@@ -149,38 +175,48 @@ export function deleteBook(path: string): void {
 
 export type Sweep = { deleted: string[]; open: string[] };
 
-/** Deletes books whose owner session file is gone and child books no open book links; lists the rest. */
-export function sweep(env: NodeJS.ProcessEnv = process.env): Sweep {
+function sessionGone(book: Book): boolean {
+	const session = book.header.session;
+	return typeof session === "string" ? !existsSync(session) : Date.now() - statSync(book.path).mtimeMs > STALE_UNSAVED_MS;
+}
+
+/**
+ * Deletes books whose owner session file is gone, and child books that no open book links and whose own
+ * session file is gone too; a running child whose parent has not linked it yet stays. Lists the deletions
+ * of every project but only the open books of the project `cwd` belongs to.
+ */
+export function sweep(env: NodeJS.ProcessEnv = process.env, cwd?: string): Sweep {
 	const root = booksRoot(env);
 	const result: Sweep = { deleted: [], open: [] };
 	if (!existsSync(root)) return result;
+	const slug = cwd ? projectSlug(cwd) : undefined;
 	const linked = new Set<string>();
 	const children: Book[] = [];
 	for (const project of readdirSync(root)) {
 		const dir = join(root, project);
 		if (!statSync(dir).isDirectory()) continue;
 		for (const file of readdirSync(dir)) {
-			if (file.endsWith(".yml")) {
-				const book = parseBook(join(dir, file));
-				if (!book) continue;
-				const session = book.header.session;
-				const stale = typeof session === "string" ? !existsSync(session) : Date.now() - statSync(book.path).mtimeMs > STALE_UNSAVED_MS;
-				if (stale) {
-					deleteBook(book.path);
-					result.deleted.push(book.path);
-				} else {
-					result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
-					for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
-				}
+			if (!file.endsWith(".yml")) continue;
+			const book = parseBook(join(dir, file));
+			if (!book) continue;
+			if (sessionGone(book)) {
+				deleteBook(book.path);
+				result.deleted.push(book.path);
+				continue;
 			}
+			if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
+			for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
 		}
 		const agents = join(dir, "agents");
 		if (existsSync(agents)) {
-			for (const file of readdirSync(agents)) if (file.endsWith(".yml")) children.push({ path: join(agents, file), header: {}, entries: [] });
+			for (const file of readdirSync(agents)) {
+				const child = file.endsWith(".yml") ? parseBook(join(agents, file)) : undefined;
+				if (child) children.push(child);
+			}
 		}
 	}
 	for (const child of children) {
-		if (linked.has(basename(child.path, ".yml"))) continue;
+		if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
 		deleteBook(child.path);
 		result.deleted.push(child.path);
 	}
@@ -199,11 +235,15 @@ export function currentIntent(entries: Entry[]): string | undefined {
 	return found?.intent as string | undefined;
 }
 
+const NOT_STAGES = new Set(["base", "link", "close", "task", "taskrun", "verification", "skip", "back", "friction", "reflect", "goldfish"]);
+
+/** The stages the book shows, in order of first appearance; `edit` entries read as `act`. */
 export function stagesDone(entries: Entry[]): string[] {
 	const seen: string[] = [];
 	for (const entry of entries) {
-		if (["base", "link", "close", "task", "taskrun"].includes(entry.stage) || entry.stage === "verification") continue;
-		if (!seen.includes(entry.stage)) seen.push(entry.stage);
+		if (NOT_STAGES.has(entry.stage)) continue;
+		const name = entry.stage === "edit" ? "act" : entry.stage;
+		if (!seen.includes(name)) seen.push(name);
 	}
 	return seen;
 }
@@ -213,8 +253,9 @@ export function lastIndex(entries: Entry[], ...stages: string[]): number {
 	return -1;
 }
 
-export function hasAnchor(entries: Entry[]): boolean {
-	return entries.some((entry) => entry.stage === "anchor");
+/** The index of the latest change entry (a production write or edit, a commit), or -1. */
+export function lastActIndex(entries: Entry[]): number {
+	return lastIndex(entries, "edit");
 }
 
 export function reviews(entries: Entry[]): Entry[] {
@@ -237,25 +278,32 @@ export function reviewTrend(entries: Entry[]): string {
 	return `${rounds.length} round(s): ${rounds.map((round) => (round.blocking === true ? `blocking${round.p0 !== undefined ? ` P0=${round.p0} P1=${round.p1}` : ""}` : round.blocking === false ? "clear" : "unknown")).join(" → ")}`;
 }
 
-/** A review recorded after the last act with no blocking finding on it. */
+/** A review recorded after the last change with no blocking finding on it. */
 export function reviewClearAfterLastAct(entries: Entry[]): boolean {
 	const review = lastIndex(entries, "review");
-	return review >= 0 && review > lastIndex(entries, "act") && entries[review].blocking === false;
+	return review >= 0 && review > lastActIndex(entries) && entries[review].blocking === false;
 }
 
+/** The latest anchor command, the one a bash call is matched against; a stated `Reality anchor:` line is prose and never matches. */
+export function anchorCommand(entries: Entry[]): string | undefined {
+	const found = [...entries].reverse().find((entry) => entry.stage === "anchor" && entry.command === true && typeof entry.check === "string");
+	return found?.check as string | undefined;
+}
+
+/** The latest anchor of either kind, for display. */
 export function latestAnchor(entries: Entry[]): string | undefined {
 	const found = [...entries].reverse().find((entry) => entry.stage === "anchor" && typeof entry.check === "string");
 	return found?.check as string | undefined;
 }
 
 function evidenceLine(entry: Entry): string {
-	return `${entry.stage} ${entry.skip ? `skipped (${entry.skip})` : `exit ${entry.exit ?? "unknown"}${entry.last ? `: ${entry.last}` : ""}`}`;
+	return `${entry.stage} ${entry.declared ? `declared: ${entry.note ?? entry.result}` : `exit ${entry.exit ?? "unknown"}${entry.last ? `: ${entry.last}` : ""}`}`;
 }
 
-/** The latest check or verify entry after the last act, or undefined when none follows it. */
+/** The latest check or verify entry after the last change, or undefined when none follows it. */
 export function verifyAfterLastAct(entries: Entry[]): Entry | undefined {
 	const index = lastIndex(entries, "check", "verify");
-	return index >= 0 && index > lastIndex(entries, "act") ? entries[index] : undefined;
+	return index >= 0 && index > lastActIndex(entries) ? entries[index] : undefined;
 }
 
 export function childIds(entries: Entry[]): string[] {
@@ -269,10 +317,78 @@ export function childLines(entries: Entry[], env: NodeJS.ProcessEnv = process.en
 		const link = entries.find((entry) => entry.stage === "link" && entry.child === id);
 		const child = findChildBook(id, env);
 		if (!child) continue;
-		const lastCheck = [...child.entries].reverse().find((entry) => entry.stage === "check");
-		lines.push(`${link?.name ?? id}: ${currentKind(child.entries) ?? "no kind"}; stages ${stagesDone(child.entries).join(", ") || "none"}; ${lastCheck ? evidenceLine(lastCheck) : "no check"}`);
+		const lastCheck = [...child.entries].reverse().find((entry) => entry.stage === "check" || entry.stage === "verify");
+		const friction = frictionOf(child.entries).length;
+		lines.push(
+			`${link?.name ?? id}: ${currentKind(child.entries) ?? "no kind"}${isClosed(child) ? " (closed)" : ""}; stages ${stagesDone(child.entries).join(", ") || "none"}; ${lastCheck ? evidenceLine(lastCheck) : "no check"}${friction ? `; ${friction} friction` : ""}`,
+		);
 	}
 	return lines;
+}
+
+// --- friction and reflection ---------------------------------------------------------------------
+
+export function frictionOf(entries: Entry[]): Entry[] {
+	return entries.filter((entry) => entry.stage === "friction");
+}
+
+export type FrictionItem = { ref: string; owner: string; tried: string; found: string; led_by: string; reflected: boolean; class?: string; action?: string };
+
+function coveringReflect(entries: Entry[], refs: string[]): Entry | undefined {
+	return entries.find((entry) => entry.stage === "reflect" && Array.isArray(entry.friction) && entry.friction.some((id: unknown) => refs.includes(String(id))));
+}
+
+function item(owner: string, ref: string, entry: Entry, reflect: Entry | undefined): FrictionItem {
+	return {
+		ref,
+		owner,
+		tried: String(entry.tried),
+		found: String(entry.found),
+		led_by: String(entry.led_by ?? "none"),
+		reflected: reflect !== undefined,
+		...(reflect ? { class: String(reflect.class), action: String(reflect.action ?? "") } : {}),
+	};
+}
+
+/** Every friction entry of the book and of its linked children, each with the reflect that covers it, if any. */
+export function allFriction(entries: Entry[], env: NodeJS.ProcessEnv = process.env): FrictionItem[] {
+	const items = frictionOf(entries).map((entry) => item("main", String(entry.id), entry, coveringReflect(entries, [String(entry.id)])));
+	for (const id of childIds(entries)) {
+		const child = findChildBook(id, env);
+		if (!child) continue;
+		const link = entries.find((entry) => entry.stage === "link" && entry.child === id);
+		const label = String(link?.name ?? id);
+		for (const entry of frictionOf(child.entries)) {
+			const reflect = coveringReflect(entries, [`${label}#${entry.id}`, `${id}#${entry.id}`]) ?? coveringReflect(child.entries, [String(entry.id)]);
+			items.push(item(label, `${label}#${entry.id}`, entry, reflect));
+		}
+	}
+	return items;
+}
+
+export type RetryPair = { key: string; fail: number; pass: number };
+
+/** Runs that failed and later passed, per anchor and per task anchor, found from the recorded exit codes. */
+export function retryPairs(entries: Entry[]): RetryPair[] {
+	const pairs: RetryPair[] = [];
+	const failed = new Map<string, number>();
+	entries.forEach((entry, index) => {
+		const key = entry.stage === "taskrun" ? `task#${entry.id}` : entry.stage === "verify" || entry.stage === "check" ? "anchor" : undefined;
+		if (!key || typeof entry.exit !== "number") return;
+		if (entry.exit !== 0) {
+			if (!failed.has(key)) failed.set(key, index);
+		} else if (failed.has(key)) {
+			pairs.push({ key, fail: failed.get(key) as number, pass: index });
+			failed.delete(key);
+		}
+	});
+	return pairs;
+}
+
+/** A retry pair that no friction entry follows. */
+export function retryWithoutFriction(entries: Entry[]): boolean {
+	const lastFriction = lastIndex(entries, "friction");
+	return retryPairs(entries).some((pair) => pair.pass > lastFriction);
 }
 
 // --- todos ---------------------------------------------------------------------------------------
@@ -353,12 +469,13 @@ export function touchRepo(book: Book, path: string): boolean {
 	return true;
 }
 
-export type Diff = { summary: string; files: string[] };
+export type Diff = { summary: string; files: string[]; paths: string[] };
 
 /** The diff of each base's repo against its recorded HEAD, as one summary line per repo and the changed files. */
 export function diffAgainstBases(entries: Entry[]): Diff {
 	const lines: string[] = [];
 	const files: string[] = [];
+	const paths: string[] = [];
 	for (const { repo, head } of bases(entries)) {
 		const stat = git(repo, ["diff", "--shortstat", head]);
 		const names = git(repo, ["diff", "--name-only", head])?.split("\n").filter(Boolean) ?? [];
@@ -369,8 +486,9 @@ export function diffAgainstBases(entries: Entry[]): Diff {
 		}
 		lines.push(`${basename(repo)}: ${stat || "no tracked changes"}${untracked.length ? `; ${untracked.length} untracked` : ""}`);
 		files.push(...names.map((name) => `${basename(repo)}/${name}`), ...untracked.map((name) => `${basename(repo)}/${name}`));
+		paths.push(...[...names, ...untracked].map((name) => join(repo, name)));
 	}
-	return { summary: lines.join("\n") || "no repository", files };
+	return { summary: lines.join("\n") || "no repository", files, paths };
 }
 
 export function diffText(diff: Diff, limit = 1200): string {
@@ -452,7 +570,11 @@ export function summarizeArtifact(entries: Entry[], path: string, text: string):
 	fields.sections = now;
 	fields.changed = Object.keys(now).filter((heading) => old[heading] !== now[heading]);
 	if (before) fields.removed = Object.keys(old).filter((heading) => !(heading in now));
-	if (kind === "spec") fields.status = /^\s*Status:\s*(\S+)/m.exec(text)?.[1] ?? null;
+	if (kind === "spec") {
+		fields.status = /^\s*Status:\s*(\S+)/m.exec(text)?.[1] ?? null;
+		fields.approvedFrom = /^\s*Approved from:\s*\S/m.test(text);
+	}
+	if (kind === "design") fields.approach = approachFilled(text);
 	if (kind === "verification") {
 		const counts: Record<string, number> = { pass: 0, fail: 0, unknown: 0 };
 		for (const cells of tableRows(text)) {
@@ -464,12 +586,45 @@ export function summarizeArtifact(entries: Entry[], path: string, text: string):
 	return { stage: kind, fields };
 }
 
-/** The `Status:` value of the latest spec the book recorded, or undefined when none is recorded or readable. */
-export function specStatus(entries: Entry[], cwd: string): string | undefined {
-	const spec = [...entries].reverse().find((entry) => entry.stage === "spec" && typeof entry.path === "string");
-	if (!spec) return undefined;
+/** True when a heading named Approach (or 做法) has text under it, subsections included. */
+export function approachFilled(text: string): boolean {
+	const lines = text.split("\n");
+	const start = lines.findIndex((line) => /^#{1,6}\s+.*(approach|做法)/i.test(line));
+	if (start < 0) return false;
+	const depth = /^(#+)/.exec(lines[start])?.[1].length ?? 1;
+	for (const line of lines.slice(start + 1)) {
+		const heading = /^(#+)\s/.exec(line);
+		if (heading && heading[1].length <= depth) break;
+		if (line.trim() && !heading) return true;
+	}
+	return false;
+}
+
+const SPEC_FOLDER = /docs\/specs\/[^\s/#"'`)\]]+/;
+
+/** The spec folder of the loop: the one a recorded artifact lives in, else one named by the intent or a todo, if it exists. */
+export function specFolder(entries: Entry[], todos: Task[], cwd: string): string | undefined {
+	const artifact = [...entries].reverse().find((entry) => typeof entry.path === "string" && artifactKind(entry.path));
+	if (artifact) return dirname(artifact.path as string);
+	const texts = [
+		currentIntent(entries) ?? "",
+		...entries.filter((entry) => entry.stage === "task").flatMap((entry) => [String(entry.subject ?? ""), ...((entry.refs ?? []) as { ref: string }[]).map((item) => item.ref)]),
+		...todos.flatMap((task) => [task.subject, ...refsOf(task.metadata), String(task.metadata?.anchor ?? "")]),
+	];
+	for (const text of texts) {
+		const found = SPEC_FOLDER.exec(text)?.[0];
+		if (found && existsSync(resolve(cwd, found))) return found;
+	}
+	return undefined;
+}
+
+/** The artifact `name` in `folder` as a summary entry read from disk, for a loop that did not write it. */
+export function artifactOnDisk(folder: string, name: string, cwd: string): Entry | undefined {
+	const path = join(folder, `${name}.md`);
 	try {
-		return /^\s*Status:\s*(\S+)/m.exec(readFileSync(resolve(cwd, spec.path as string), "utf-8"))?.[1];
+		const text = readFileSync(resolve(cwd, path), "utf-8");
+		const summary = summarizeArtifact([], path, text);
+		return summary ? { ts: "", stage: summary.stage, ...summary.fields } : undefined;
 	} catch {
 		return undefined;
 	}

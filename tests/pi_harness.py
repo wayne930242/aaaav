@@ -17,6 +17,8 @@ PI_DIR = Path(__file__).resolve().parent.parent / "pi"
 # Replays steps against the registered handlers and tools and prints what the extensions returned.
 HARNESS = """
 import { registerHooks } from "node:module";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 // pi provides its own package to extensions; the stub carries the one value export they use.
 const PI_STUB = String.raw`export function parseSkillBlock(text) { return null; }`;
 registerHooks({
@@ -71,7 +73,11 @@ async function dispatch(event, payload) {
 }
 for (const step of JSON.parse(stepsJson)) {
   try {
-    if (step.branchAdd) {
+    if (step.file) {
+      mkdirSync(dirname(resolve(cwd, step.file)), { recursive: true });
+      writeFileSync(resolve(cwd, step.file), step.text);
+      out.results.push(null);
+    } else if (step.branchAdd) {
       branch.push(...step.branchAdd);
       out.results.push(null);
     } else if (step.tool) {
@@ -123,6 +129,11 @@ def todo_state(*tasks: dict) -> dict:
     """A branch entry holding the todo list as rpiv-todo persists it."""
     listed = [{"id": i + 1, **task} for i, task in enumerate(tasks)]
     return {"type": "custom", "customType": "rpiv-todo-state", "data": {"tasks": listed, "nextId": len(listed) + 1}}
+
+
+def write_file(path: str, text: str) -> dict:
+    """A step that writes a file under the work directory while the replay runs."""
+    return {"file": path, "text": text}
 
 
 def stage(**params) -> dict:
