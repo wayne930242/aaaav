@@ -130,7 +130,7 @@ The design in `phases.md` (this folder) is binding, summarized here:
 
 The agent declares only what the program cannot observe; everything observable is derived from evidence. This amendment overrides earlier sections where they conflict.
 
-- Declarations: `kind` (kind, intent, optional `anchor` command; calling it again upgrades kind or sets the anchor, e.g. once a durable design is done), `verify` (only for an anchor that is not a command: human judgment or a user operation, with a note), `friction`, `reflect`, `skip`, `back`, `close`, and the query `read`. Nothing else is accepted.
+- Declarations: `kind` (kind, intent, optional `anchor` command; calling it again upgrades kind or sets the anchor, e.g. once a durable design is done), `verify` (only for an anchor that is not a command: human judgment or a user operation, with a note), `fresh-read` (manual goldfish completion, replacing the manual `read` of 2ea9f84 so `read` stays the query), `friction`, `reflect`, `skip`, `back`, `close`, and the query `read`. Nothing else is accepted.
 - Derived, never declared: act (write/edit/commit), check/verify for a command anchor (exit code of a bash call containing the anchor command, or a task's own anchor), review rounds (reviewer results), decide/grill/spec/approve/design (spec files), read (Jev detection), retry pairs.
 - Inside an open loop the `kind` call replaces the prose `Alignment:`, `Inline — Contract:`, and `Reality anchor:` lines: intent is the alignment and contract, `anchor` the reality anchor. A `Reality anchor:` line still counts when written, so existing briefs keep working. Outside a loop nothing is required.
 - `quick` has no phase warnings; its only prompt is the close reminder.
