@@ -119,3 +119,9 @@ The design in `phases.md` (this folder) is binding, summarized here:
 - Phases regress when evidence changes (spec back to proposed, a diff after verify), and the next jump warns again.
 - The anchor gate, the durable approval warning, and the two-rounds-blocking warning become phase-machine checks, not separate mechanisms.
 - The program computes the next phase; `read` shows `<kind> · phase <current> ✓ → <next> (missing: …) · skipped: …`. Jev's state gains `phase` (current, next, missing) and Jev judges only whether the completion condition truly holds and whether to advance, go back, or ask the user.
+
+## Amendment: friction in the phase machine, Jev read detection, manual regression (user 2026-10-29)
+
+- Friction and reflection join the phase machine: every kind gains a `reflect` phase just before `close`. Entry: the previous phase complete or skipped. Completion: every `friction` entry (own and linked children's) has a `reflect` entry. Auto-skipped when the loop has no friction. Closing with unreflected friction is a phase jump: it warns once, never refuses; the todo followup rule stays the only refusal.
+- `read` (goldfish) detection: a manual `anchorloop_stage read` completes the phase and skips detection. Otherwise, when a dispatched subagent returns after the spec became proposed, Jev judges from its brief and result whether it was a fresh-context read of the spec (restated contract, listed guesses); the brief containing the spec path is a pre-filter, not the verdict.
+- Manual regression: `anchorloop_stage back <phase> <reason>` moves the loop back to that phase; later phases count as incomplete until their completion conditions hold again, and the entry is recorded and shown in the close summary.
