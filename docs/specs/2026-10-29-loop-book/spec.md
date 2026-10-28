@@ -62,9 +62,10 @@ Valid YAML at `~/.pi/agent/anchorloop/books/<project-slug>/<book-id>.yml`, child
 
 ### Second thought
 
-- Runs only while a loop is open, at a `verify` or `close` declaration, and when a run settles with the loop open and every todo `completed` (then it reminds the agent to close).
-- Sends Jev only `intent`, `anchor`, `diff` (≤1200 chars), and `verify` (stages, review rounds, child checks) from the book. The `checkpoint` question is removed.
-- `done` asks whether the verify evidence covers the intent; `review` asks which review the diff still needs given the recorded reviews; `quality` is unchanged.
+- Runs only while a loop is open: when a run settles and the book gained an entry since the last judgment, and at a `close` declaration.
+- Sends Jev only `kind`, `intent`, `anchor`, `diff` (≤1200 chars), `verify` (stages, review rounds, child checks), and `todos` (open count) from the book. The `checkpoint` question is removed.
+- Its main output is a **next-stage suggestion**, a choice question: `continue` (keep acting), `verify`, `review`, `fix`, `close`, or `ask-user`. `done` asks whether the verify evidence covers the intent; `review` asks which review the diff still needs given the recorded reviews; `quality` is unchanged.
+- The advisory message to main leads with the suggestion, e.g. `Second thought: next → close (verify pass after last change, review r2 clear, 0 open todos)`. It is advisory; it continues the run only when the suggestion is `verify`, `review`, or `fix` and the book shows that stage missing after the last `act`, once per run.
 - When a review is recorded after the last `act`/`fix` with no open blocking finding, a `full` rating shows a note and does not request a recheck.
 
 ### Skill text trims
