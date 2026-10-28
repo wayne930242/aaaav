@@ -45,6 +45,17 @@ Any stage accepts `skip: <reason>`. Missing stages produce warnings, not refusal
 
 In a subagent (`isSubagent()` in `pi/second-thought.ts`), the book lives under the child's `PI_SUBAGENT_ID` and a declared `verify` is recorded as `check`; only main records `verify` and `review`. Main links a child book when its `subagent` tool result returns the child id, and `read` includes each linked child's summary.
 
+### Friction and reflection
+
+Agents write their own mistakes and friction into the book, so the reflexive loop reads one source:
+
+- `anchorloop_stage friction` with `tried`, `found`, and `led_by` (the skill or instruction line that prompted the attempt, or `none`) appends a numbered `friction` entry. Main and subagents both write it; a child's friction shows in main's `read` and in the Jev state under its child id.
+- The book records failed attempts automatically: each anchor, check, or task-anchor run keeps its exit code, so a fail later followed by a pass is visible as a `retry` pair without any agent call.
+- `anchorloop_stage reflect` with `friction` ids, `class` (`misdirection`, `gap`, or `resolved`), and `action` (e.g. `solid-loop`, `memory`, a commit) appends a `reflect` entry.
+- Second thought adds two next-stage choices: `friction` when the book shows a `retry` pair with no friction entry after it, and `reflect` when friction entries lack a `reflect`. Both are advisory.
+- `close` does not refuse over friction. Its session entry carries every friction entry with its reflect class, so the record survives the book's deletion, and its result lists unreflected friction for the Reflexive Pass.
+- The Friction Notes section of `skills/anchorloop/SKILL.md` points to `anchorloop_stage friction` instead of `scratch/friction.md`; the Reflexive Pass reads the book's friction entries.
+
 ### Todo links
 
 Inside an open loop, each `todo` create or update is recorded as a task entry carrying its id, subject, status, and these `metadata` keys when present:
