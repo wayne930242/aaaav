@@ -125,3 +125,14 @@ The design in `phases.md` (this folder) is binding, summarized here:
 - Friction and reflection join the phase machine: every kind gains a `reflect` phase just before `close`. Entry: the previous phase complete or skipped. Completion: every `friction` entry (own and linked children's) has a `reflect` entry. Auto-skipped when the loop has no friction. Closing with unreflected friction is a phase jump: it warns once, never refuses; the todo followup rule stays the only refusal.
 - `read` (goldfish) detection: a manual `anchorloop_stage read` completes the phase and skips detection. Otherwise, when a dispatched subagent returns after the spec became proposed, Jev judges from its brief and result whether it was a fresh-context read of the spec (restated contract, listed guesses); the brief containing the spec path is a pre-filter, not the verdict.
 - Manual regression: `anchorloop_stage back <phase> <reason>` moves the loop back to that phase; later phases count as incomplete until their completion conditions hold again, and the entry is recorded and shown in the close summary.
+
+## Amendment: lean surface (user 2026-10-29: "務必確保流程能精簡")
+
+The agent declares only what the program cannot observe; everything observable is derived from evidence. This amendment overrides earlier sections where they conflict.
+
+- Declarations: `kind` (kind, intent, optional `anchor` command; calling it again upgrades kind or sets the anchor, e.g. once a durable design is done), `verify` (only for an anchor that is not a command: human judgment or a user operation, with a note), `friction`, `reflect`, `skip`, `back`, `close`, and the query `read`. Nothing else is accepted.
+- Derived, never declared: act (write/edit/commit), check/verify for a command anchor (exit code of a bash call containing the anchor command, or a task's own anchor), review rounds (reviewer results), decide/grill/spec/approve/design (spec files), read (Jev detection), retry pairs.
+- Inside an open loop the `kind` call replaces the prose `Alignment:`, `Inline — Contract:`, and `Reality anchor:` lines: intent is the alignment and contract, `anchor` the reality anchor. A `Reality anchor:` line still counts when written, so existing briefs keep working. Outside a loop nothing is required.
+- `quick` has no phase warnings; its only prompt is the close reminder.
+- Every warning and second-thought message is one line, once per phase jump or judgment; a repeated identical one is suppressed.
+- Skill text gets shorter: the Align and Anchor ritual lines, the `Inline — Contract:` line in coding, and the Friction Notes format block are replaced by one paragraph naming the declarations. `skills/anchorloop/SKILL.md` and `skills/coding/SKILL.md` must end shorter than at 9034242.
