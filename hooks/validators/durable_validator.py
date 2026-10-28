@@ -14,7 +14,7 @@ def check_decision_md(path: Path) -> list[str]:
 
     # Check for decision table
     if not re.search(r"\|\s*Question\s*\|\s*Answer\s*\|\s*Basis\s*\|\s*Status\s*\|", text, re.IGNORECASE):
-        warnings.append("decision.md should include a Question | Answer | Basis | Status table.")
+        warnings.append("decision.md should include a Question | Answer | Basis | Status table (Status: grounded, confirmed, or open).")
 
     # Check for pre-flight readiness (core rules)
     lower = text.lower()
