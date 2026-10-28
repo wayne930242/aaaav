@@ -118,14 +118,14 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 
 /** The command with quoted strings blanked out, keeping every index, so quoted text never counts as a run or a separator. */
 function unquoted(command: string): string {
-	const masked = command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, (quoted) => " ".repeat(quoted.length));
-	// A `#` that starts a word comments out the rest of the line.
-	return masked.replace(/(^|\s)#[^\n]*/g, (comment, lead: string) => lead + " ".repeat(comment.length - lead.length));
+	// One left-to-right pass, so whichever starts first wins: a quote, or a `#` that starts a word and comments out its line.
+	// Newlines inside quotes are kept, since they still separate commands for the scan.
+	return command.replace(/'[^']*'|"(?:\\.|[^"\\])*"|(^|\s)#[^\n]*/g, (span) => span.replace(/[^\n]/g, " "));
 }
 
 /** Text before a run with `VAR=value` and simple wrappers (`uv run`, `time`, `timeout N`, `env`) peeled off its end. */
 function beforeRun(text: string): string {
-	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+\S+\s+|\benv\s+)+$/, "");
+	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+[^\s;&|]+\s+|\benv\s+)+$/, "");
 }
 
 // `cd` and `export` change what a check tests, so they are not setup.

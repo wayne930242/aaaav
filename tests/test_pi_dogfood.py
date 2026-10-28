@@ -98,6 +98,10 @@ class TestReview4(BookCase):
             with self.subTest(command=command):
                 self.assertIn(self.exits(command, 0)[-1:], ([], ["unknown"]))
 
+    def test_a_comment_with_an_apostrophe_does_not_hide_a_later_separator(self):
+        self.assertEqual(self.exits("pytest -q  # don't touch\necho 'x' || true", 0)[-1], "unknown")
+        self.assertEqual(self.exits("timeout || pytest -q", 0)[-1], "unknown")
+
     def test_common_wrappers_still_count_as_a_run(self):
         for command in ("uv run pytest -q", "time pytest -q", "timeout 600 pytest -q", "env A=1 pytest -q", "(cd x && pytest -q)"):
             with self.subTest(command=command):
