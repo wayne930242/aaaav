@@ -55,7 +55,7 @@ Inside an open loop, each `todo` create or update is recorded as a task entry ca
 
 The Jev state includes this task list with a one-line legend (`#id status subject — anchor (last exit) — ref → line range; missing = heading gone`), so Jev can judge each task's own anchor and spec coverage.
 
-`read` lists each task as `#id status subject — anchor — refs (line ranges)` and, when a bash call matched a task's own `anchor`, its last exit code. A task in an `inline`, `reviewed`, or `durable` loop without `anchor` or `ref` is recorded as is; no warning. The skill text names the keys in one line where `todo` is introduced.
+`read` lists each task as `#id status subject — anchor — refs (line ranges)` and, when a bash call matched a task's own `anchor`, its last exit code. A task in an `inline`, `reviewed`, or `durable` loop without `anchor` or `ref` is recorded as is; no warning. The skill text mentions the keys once, as optional, in a clause where `todo` is introduced (e.g. "a todo may carry `anchor` or `ref` in its metadata when its check or source differs from the loop's"); it does not ask agents to fill them, because the second thought catches missing coverage. `followup` is named only in the close rule.
 
 ### Durable artifacts recorded automatically
 
