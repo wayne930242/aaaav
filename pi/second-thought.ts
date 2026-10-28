@@ -23,7 +23,7 @@ export type { Snapshot };
 export const ENTRY_TYPE = "anchorloop-second-thought";
 const WAIT_TOOLS = new Set(["MonitorCreate", "LoopCreate", "goal_wait", "subagent", "subagent_resume", "subagent_send"]);
 
-export const THRESHOLDS = { completeBelow: 0.5, doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
+export const THRESHOLDS = { doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
 
 export const MOVES = ["advance", "back", "ask-user"] as const;
 export type Move = (typeof MOVES)[number];
@@ -40,14 +40,6 @@ export const QUESTIONS = {
 			advance: "the recorded evidence supports the last complete phase and the next phase can proceed",
 			back: "evidence recorded for an earlier phase is wrong, stale, or contradicted by a later result",
 			"ask-user": "a decision or judgment that belongs to the user blocks progress",
-		},
-	},
-	complete: {
-		type: "bool" as const,
-		instructions: "Does the evidence in `diff`, `verify`, and `phase` show that the completion condition of the last complete phase (`phase` current) truly holds, beyond the program's mechanical check?",
-		criteria: {
-			true: "the evidence observably meets what the phase requires",
-			false: "the phase counts as complete on a mechanical signal, but its content is empty, stale, or off the intent",
 		},
 	},
 	done: {
@@ -79,16 +71,15 @@ export const QUESTIONS = {
 	},
 };
 
-export type Verdict = { move: Move; complete: number; done: number; review: string; reviewProbability: number; quality: number };
+export type Verdict = { move: Move; done: number; review: string; reviewProbability: number; quality: number };
 
 export function readVerdict(answers: Answers): Verdict | undefined {
-	const { move, complete, done, review, quality } = answers;
-	if (move?.type !== "choice" || complete?.type !== "bool" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
+	const { move, done, review, quality } = answers;
+	if (move?.type !== "choice" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
 	if (!(MOVES as readonly string[]).includes(move.choice ?? "")) return undefined;
 	const choice = review.choice ?? "";
 	return {
 		move: move.choice as Move,
-		complete: complete.probability ?? 0,
 		done: done.probability ?? 0,
 		review: choice,
 		reviewProbability: review.probabilities?.[choice] ?? 0,
@@ -99,7 +90,6 @@ export function readVerdict(answers: Answers): Verdict | undefined {
 export function assess(verdict: Verdict, snap: Snapshot): { found: string[]; notes: string[] } {
 	const found: string[] = [];
 	const notes: string[] = [];
-	if (verdict.complete < THRESHOLDS.completeBelow && snap.current !== "start") found.push(`${snap.current} not shown to be complete`);
 	if (verdict.done < THRESHOLDS.doneBelow) found.push("evidence not shown to cover the intent");
 	if (verdict.review === THRESHOLDS.reviewTier) {
 		if (snap.reviewClear) notes.push("review rated full, but a review recorded after the last change found no blocking finding");
@@ -119,7 +109,7 @@ export function message(verdict: Verdict, snap: Snapshot, found: string[], notes
 	const extra = [...found, ...notes, ...snap.hints];
 	return (
 		`Second thought (Jev, advisory): next → ${snap.next}${snap.missing ? ` (missing: ${snap.missing})` : ""}; ` +
-		`${verdict.move}; complete ${verdict.complete.toFixed(2)}, done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
+		`${verdict.move}; done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
 		`${extra.length ? `; ${extra.join("; ")}` : ""}.` +
 		(!atClose && continues(verdict, snap) ? ` Do ${snap.next} now, or say why it does not apply.` : "")
 	);

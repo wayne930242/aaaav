@@ -118,7 +118,7 @@ The design in `phases.md` (this folder) is binding, summarized here:
 - Acting in a phase whose predecessor is incomplete warns once per jump, naming what is missing and the `anchorloop_stage skip <phase> <reason>` escape. Skips are recorded and shown in the close summary.
 - Phases regress when evidence changes (spec back to proposed, a diff after verify), and the next jump warns again.
 - The anchor gate, the durable approval warning, and the two-rounds-blocking warning become phase-machine checks, not separate mechanisms.
-- The program computes the next phase; `read` shows `<kind> · phase <current> ✓ → <next> (missing: …) · skipped: …`. Jev's state gains `phase` (current, next, missing) and Jev judges only whether the completion condition truly holds and whether to advance, go back, or ask the user.
+- The program computes the next phase; `read` shows `<kind> · phase <current> ✓ → <next> (missing: …) · skipped: …`. Jev's state gains `phase` (current, next, missing) and Jev judges only whether to advance, go back, or ask the user; phase completion comes from the program's evidence alone (2.2.2).
 
 ## Amendment: friction in the phase machine, Jev read detection, manual regression (user 2026-10-29)
 

@@ -227,7 +227,7 @@ class TestSecondThought(ExtensionCase):
         legend, task = state["tasks"].splitlines()[:2]
         self.assertEqual(legend, "legend: #id status subject — anchor (last exit) — ref → line range; missing = heading gone")
         self.assertEqual(task, "#1 in_progress build it — pytest -q (exit 0) — docs/x.md#Gone → missing")
-        self.assertEqual(out["questionSets"], [["move", "complete", "done", "review", "quality"]])
+        self.assertEqual(out["questionSets"], [["move", "done", "review", "quality"]])
 
     def test_a_childs_friction_shows_in_the_state_under_its_child_name(self):
         env = {"PI_SUBAGENT_ID": "kid", "PI_SUBAGENT_NAME": "worker-1", "PI_SUBAGENT_SESSION": str(self.session_file)}
@@ -239,7 +239,7 @@ class TestSecondThought(ExtensionCase):
     def test_the_advisory_is_one_line_that_leads_with_the_programs_next_phase(self):
         out = self.settle_after(answers(), edit_result(), bash_result("pytest -q", 0, "3 passed"))
         text = self.content(out)
-        self.assertTrue(text.startswith("Second thought (Jev, advisory): next → close; advance; complete 0.90, done 0.90, review none, quality 2.90/3."), text)
+        self.assertTrue(text.startswith("Second thought (Jev, advisory): next → close; advance; done 0.90, review none, quality 2.90/3."), text)
         self.assertNotIn("\n", text)
         self.assertEqual(out["results"][-1]["entries"][0]["data"]["move"], "advance")
         self.assertNotIn("continue", out["results"][-1])
@@ -334,9 +334,9 @@ class TestSecondThought(ExtensionCase):
         self.assertIn("friction: a failed run was retried and passed, with no friction entry after it", self.content(out))
 
     def test_low_completion_done_and_quality_are_listed_as_concerns(self):
-        out = self.settle_after(answers("advance", complete=0.1, done=0.05, quality=0.5), edit_result(), bash_result("pytest -q", 0, "ok"))
+        out = self.settle_after(answers("advance", done=0.05, quality=0.5), edit_result(), bash_result("pytest -q", 0, "ok"))
         text = self.content(out)
-        self.assertIn("verify not shown to be complete", text)
+        self.assertNotIn("not shown to be complete", text)
         self.assertIn("evidence not shown to cover the intent", text)
         self.assertIn("result below the intent", text)
 
@@ -384,7 +384,7 @@ class TestSecondThought(ExtensionCase):
         markers = [{"PI_SUBAGENT_ID": "child-1"}, {"PI_SUBAGENT_CHILD": "1"},
                    {"PI_SUBAGENT_CHILD_AGENT": "worker", "PI_SUBAGENT_PARENT_PID": "42"}]
         for env in markers:
-            out = self.replay([*self.loop(), SETTLE], classify=answers("back", 0.1, 0.1, "full", 0), env=env)
+            out = self.replay([*self.loop(), SETTLE], classify=answers("back", 0.1, "full", 0), env=env)
             self.assertIsNone(out["results"][-1], env)
             self.assertEqual(out["classifyCalls"], [], env)
 
@@ -411,12 +411,11 @@ def reviewer(text: str) -> dict:
     return {"event": "message_end", "payload": {"message": message}}
 
 
-def answers(move: str = "advance", complete: float = 0.9, done: float = 0.9, review: str = "none", quality: float = 2.9) -> dict:
+def answers(move: str = "advance", done: float = 0.9, review: str = "none", quality: float = 2.9) -> dict:
     return {
         "stopReason": "stop",
         "answers": {
             "move": {"type": "choice", "choice": move, "probabilities": {move: 0.7}},
-            "complete": {"type": "bool", "probability": complete},
             "done": {"type": "bool", "probability": done},
             "review": {"type": "choice", "choice": review, "probabilities": {review: 0.6}, "confidence": 0.4},
             "quality": {"type": "score", "score": quality, "confidence": 0.5},

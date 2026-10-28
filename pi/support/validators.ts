@@ -320,7 +320,7 @@ function checkDecisionMd(path: string): string[] {
 	const warnings: string[] = [];
 	const text = readText(path);
 	if (!/\|\s*Question\s*\|\s*Answer\s*\|\s*Basis\s*\|\s*Status\s*\|/i.test(text)) {
-		warnings.push("decision.md should include a Question | Answer | Basis | Status table.");
+		warnings.push("decision.md should include a Question | Answer | Basis | Status table (Status: grounded, confirmed, or open).");
 	}
 	const lower = text.toLowerCase();
 	if (!lower.includes("rule") && !lower.includes("readiness") && !lower.includes("prerequisite") && !lower.includes("core")) {

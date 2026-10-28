@@ -36,7 +36,7 @@ class TestSequences(PhaseCase):
         durable = self.line(self.open_loop("durable"), session="s-durable")
         self.assertEqual(quick, "quick · phase start → act (missing: a change to the code)")
         self.assertTrue(inline.startswith("inline · phase start → anchor (missing: a `Reality anchor:` line"), inline)
-        self.assertEqual(durable, "durable · phase start → decide (missing: decision.md with decision rows (no spec folder: name it in `intent` by calling `kind` again))")
+        self.assertEqual(durable, "durable · phase start → decide (missing: decision.md with decision rows with Status grounded, confirmed, or open (no spec folder: name it in `intent` by calling `kind` again))")
 
     def test_an_inline_loop_walks_anchor_act_verify_and_regresses_when_the_code_changes_again(self):
         steps = self.open_loop(anchor="pytest -q")
@@ -219,8 +219,7 @@ class TestSkipAndBack(PhaseCase):
         out = self.replay([*self.open_loop(), stage(stage="skip", phase="anchor", reason="no check"), edit(), stage(stage="back", phase="act", reason="redo"), edit(),
                            stage(stage="skip", phase="verify", reason="docs"), stage(stage="close", verdict="landed")])
         text = text_of(out["results"][-1])
-        self.assertIn("anchor skipped (no check)", text)
-        self.assertIn("verify skipped (docs)", text)
+        self.assertIn("skipped: anchor (no check), verify (docs)", text)
         self.assertIn("back act (redo)", text)
         data = out["appended"][0]["data"]
         self.assertEqual((data["skipped"], data["back"]), (["anchor (no check)", "verify (docs)"], ["act (redo)"]))
@@ -234,8 +233,8 @@ class TestCloseAndReflect(PhaseCase):
         warning = text.splitlines()[-1]
         self.assertTrue(warning.startswith("anchorloop: closed with phases not shown complete: act (a change to the code); verify ("), warning)
         self.assertNotIn("skip with", text)
-        self.assertIn("act not shown complete", text)
-        self.assertIn("anchor done", text)
+        self.assertIn("not complete: act, verify", text)
+        self.assertIn("done: anchor;", text)
 
     def test_closing_as_abandoned_or_blocked_is_not_a_jump(self):
         out = self.replay([*self.open_loop(anchor="pytest -q"), stage(stage="close", verdict="abandoned")])

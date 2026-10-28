@@ -123,10 +123,11 @@ function skipEntry(entries: Entry[], from: number, name: string): Entry | undefi
 
 /** The latest recorded summary of an artifact since `from`; a loop that never wrote it falls back to the file on disk. */
 function artifact(ctx: Ctx, name: string, from: number): Entry | undefined {
+	// The file on disk is the current state (a `sed` edit through bash is not observed); entries are history.
+	const disk = ctx.folder && from === 0 ? artifactOnDisk(ctx.folder, name, ctx.cwd) : undefined;
+	if (disk) return disk;
 	const index = lastWhere(ctx.entries, from, (entry) => entry.stage === name && entry.auto === true);
-	if (index >= 0) return ctx.entries[index];
-	const wrote = ctx.entries.some((entry) => entry.stage === name && entry.auto === true);
-	return from === 0 && !wrote && ctx.folder ? artifactOnDisk(ctx.folder, name, ctx.cwd) : undefined;
+	return index >= 0 ? ctx.entries[index] : undefined;
 }
 
 const total = (counts: unknown): number => Object.values((counts ?? {}) as Record<string, number>).reduce((sum, n) => sum + Number(n), 0);
@@ -155,7 +156,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 	switch (name) {
 		case "decide": {
 			const decision = artifact(ctx, "decision", from);
-			return total(decision?.counts) > 0 ? done(name) : missing(name, ctx.folder ? `${ctx.folder}/decision.md with decision rows` : "decision.md with decision rows (no spec folder: name it in `intent` by calling `kind` again)");
+			return total(decision?.counts) > 0 ? done(name) : missing(name, ctx.folder ? `${ctx.folder}/decision.md with decision rows (Status grounded, confirmed, or open)` : "decision.md with decision rows with Status grounded, confirmed, or open (no spec folder: name it in `intent` by calling `kind` again)");
 		}
 		case "grill": {
 			const decision = artifact(ctx, "decision", from);

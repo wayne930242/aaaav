@@ -8,6 +8,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
@@ -44,6 +45,7 @@ import {
 	taskDetails,
 	sweep,
 	touchRepo,
+	touchRepoBeforeMerge,
 	validFollowup,
 	verifyAfterLastAct,
 } from "./support/book.ts";
@@ -114,18 +116,65 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
+/** The command with quoted strings blanked out, keeping every index, so quoted text never counts as a run or a separator. */
+function unquoted(command: string): string {
+	// One left-to-right pass, so whichever starts first wins: a quote, or a `#` that starts a word and comments out its line.
+	// Newlines inside quotes are kept, since they still separate commands for the scan.
+	return command.replace(/'[^']*'|"(?:\\.|[^"\\])*"|(^|\s)#[^\n]*/g, (span) => span.replace(/[^\n]/g, " "));
+}
+
+/** Text before a run with `VAR=value` and simple wrappers (`uv run`, `time`, `timeout N`, `env`) peeled off its end. */
+function beforeRun(text: string): string {
+	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+[^\s;&|]+\s+|\benv\s+)+$/, "");
+}
+
+// `cd` and `export` change what a check tests, so they are not setup.
+const SETUP_SEGMENT = /^\s*(\.|source\b|set\b|\w+=)/;
+
+/**
+ * Where `command` runs `anchor` as a command (at the start, or after `&&`, `||`, `;`, `|`, `!`, `(` or a newline, outside quotes,
+ * past any `VAR=value` prefixes), as the last such run, or undefined. The full anchor is tried first; an anchor whose earlier
+ * `&&` segments only set up the environment (`. venv/bin/activate && pytest -q`) also matches on its last segment.
+ */
+export function anchorRun(command: string, anchorText: string): { at: number; anchor: string } | undefined {
+	const masked = unquoted(command);
+	const segments = anchorText.split("&&").map((segment) => segment.trim());
+	const candidates = [anchorText.trim()];
+	if (segments.length > 1 && segments.slice(0, -1).every((segment) => SETUP_SEGMENT.test(segment))) candidates.push(segments.at(-1)!);
+	for (const anchor of candidates) {
+		if (!anchor) continue;
+		let found: number | undefined;
+		for (let at = masked.indexOf(anchor); at >= 0; at = masked.indexOf(anchor, at + 1)) {
+			const before = beforeRun(masked.slice(0, at));
+			const after = masked.charAt(at + anchor.length);
+			// `$(`, `<(`, `>(` substitute output; their exit is not the call's.
+			if (/(^|&&|\|\||[;|!\n]|(^|[^$<>])\()\s*$/.test(before) && (after === "" || /[\s;&|)]/.test(after))) found = at;
+		}
+		if (found !== undefined) return { at: found, anchor };
+	}
+	return undefined;
+}
+
 /**
  * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when something after the anchor
- * can replace it: `||`, `;`, a newline, or a pipe straight after the anchor unless the command starts with `set -o pipefail`.
+ * can replace it: `||`, `;`, a newline, `&`, or a pipe straight after the anchor unless `set -o pipefail` is in effect before it.
  * A chain `anchor && other` keeps a failed anchor's code, so it stands.
  */
-export function anchorExit(command: string, anchor: string, exit: number | null): number | "unknown" {
+export function anchorExit(command: string, anchorText: string, exit: number | null): number | "unknown" {
 	if (exit === null) return "unknown";
-	const at = command.indexOf(anchor);
+	const run = anchorRun(command, anchorText);
+	if (!run) return "unknown";
+	const masked = unquoted(command);
+	const { at, anchor } = run;
 	// `! anchor` inverts the code and `x || anchor` may never run it.
-	if (at < 0 || /(!|\|\|)\s*$/.test(command.slice(0, at))) return "unknown";
-	const rest = command.slice(at + anchor.length);
-	const pipefail = /^\s*set\s+-o\s+pipefail\b/.test(command);
+	if (/(!|\|\|)\s*(\(\s*|cd\s+\S+\s*&&\s*)*$/.test(beforeRun(masked.slice(0, at)))) return "unknown";
+	// Inside a subshell, a pipefail set or the exit of what follows is not this shell's.
+	const depth = [...masked.slice(0, at)].reduce((open, char) => open + (char === "(" ? 1 : char === ")" ? -1 : 0), 0);
+	const rest = masked.slice(at + anchor.length);
+	// The last `set -o pipefail` or `set +o pipefail` before the anchor decides.
+	const toggles = [...masked.slice(0, at).replace(/\([^()]*\)/g, (sub) => " ".repeat(sub.length)).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
+	if (depth > 0 && toggles.length === 0 && /\|(?!\|)/.test(rest)) return "unknown";
+	const pipefail = toggles.at(-1)?.[1] === "-";
 	let chained = false;
 	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe
 	// straight after the anchor unless pipefail is set.
@@ -251,7 +300,15 @@ export default function (pi: ExtensionAPI) {
 		const tail = unreflected.length
 			? ` Unreflected friction for the Reflexive Pass: ${unreflected.map((item) => `${item.ref} (${item.found})`).join("; ")}.`
 			: "";
-		const shown = phaseList.map((item) => `${item.phase} ${item.state}${item.note ? ` (${item.note})` : ""}`).join(", ");
+		const named = (item: (typeof phaseList)[number]) => `${item.phase}${item.note ? ` (${item.note})` : ""}`;
+		const doneNames = phaseList.filter((item) => item.state === "done").map((item) => item.phase);
+		const skippedNames = phaseList.filter((item) => item.state === "skipped" || item.state === "auto-skipped").map(named);
+		const openNames = phaseList.filter((item) => item.state === "not shown complete").map((item) => item.phase);
+		const shown = [
+			`done: ${doneNames.join(", ") || "none"}`,
+			...(skippedNames.length ? [`skipped: ${skippedNames.join(", ")}`] : []),
+			...(openNames.length ? [`${verdict === "landed" ? "not complete" : "not reached"}: ${openNames.join(", ")}`] : []),
+		].join("; ");
 		const back = summary.back.length ? `; back ${summary.back.join(", ")}` : "";
 		const text = `Loop closed (${verdict}): phases ${shown}; ${summary.reviewTrend}; diff ${diff.summary.split("\n").join("; ")}${back}.${tail}`;
 		const after = notice ? `\n${notice}` : "";
@@ -408,14 +465,20 @@ export default function (pi: ExtensionAPI) {
 		const exit = bashExit(event);
 		const last = lastLine(output);
 		const anchor = anchorCommand(book.entries);
-		if (anchor && command.includes(anchor)) {
+		if (anchor && anchorRun(command, anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
 			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
-			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
+			if (typeof task.anchor === "string" && anchorRun(command, task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
 		}
-		if (exit === 0 && /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.test(command) && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
+		const merged = /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.exec(command);
+		if (exit === 0 && merged && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
+			// The repo is the `-C` of the merge itself, else the nearest `cd` before it.
+			const cds = [...command.slice(0, merged.index).matchAll(/\bcd\s+(\S+)/g)];
+			const named = merged[1]?.trim().replace(/^-C\s+/, "") ?? cds.at(-1)?.[1];
+			const dir = named?.replace(/^~(?=\/|$)/, homedir());
+			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), dir ?? "."), merged[2]);
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {
