@@ -44,6 +44,7 @@ import {
 	taskDetails,
 	sweep,
 	touchRepo,
+	touchRepoBeforeMerge,
 	validFollowup,
 	verifyAfterLastAct,
 } from "./support/book.ts";
@@ -114,18 +115,24 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
+/** An anchor with an environment prefix (`. venv/bin/activate && pytest -q`) matches on its last `&&` segment. */
+export function anchorSegment(anchor: string): string {
+	return anchor.split("&&").at(-1)?.trim() || anchor;
+}
+
 /**
  * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when something after the anchor
  * can replace it: `||`, `;`, a newline, or a pipe straight after the anchor unless the command starts with `set -o pipefail`.
  * A chain `anchor && other` keeps a failed anchor's code, so it stands.
  */
-export function anchorExit(command: string, anchor: string, exit: number | null): number | "unknown" {
+export function anchorExit(command: string, anchorText: string, exit: number | null): number | "unknown" {
 	if (exit === null) return "unknown";
-	const at = command.indexOf(anchor);
+	const anchor = anchorSegment(anchorText);
+	const at = command.lastIndexOf(anchor);
 	// `! anchor` inverts the code and `x || anchor` may never run it.
 	if (at < 0 || /(!|\|\|)\s*$/.test(command.slice(0, at))) return "unknown";
 	const rest = command.slice(at + anchor.length);
-	const pipefail = /^\s*set\s+-o\s+pipefail\b/.test(command);
+	const pipefail = /\bset\s+(-\w+\s+|-o\s+\w+\s+)*-o\s+pipefail\b|\bset\s+-\w*e\w*o\s+pipefail\b|\bset\s+-\w*o\s+pipefail\b/.test(command.slice(0, at));
 	let chained = false;
 	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe
 	// straight after the anchor unless pipefail is set.
@@ -251,7 +258,15 @@ export default function (pi: ExtensionAPI) {
 		const tail = unreflected.length
 			? ` Unreflected friction for the Reflexive Pass: ${unreflected.map((item) => `${item.ref} (${item.found})`).join("; ")}.`
 			: "";
-		const shown = phaseList.map((item) => `${item.phase} ${item.state}${item.note ? ` (${item.note})` : ""}`).join(", ");
+		const named = (item: (typeof phaseList)[number]) => `${item.phase}${item.note ? ` (${item.note})` : ""}`;
+		const doneNames = phaseList.filter((item) => item.state === "done").map((item) => item.phase);
+		const skippedNames = phaseList.filter((item) => item.state === "skipped" || item.state === "auto-skipped").map(named);
+		const openNames = phaseList.filter((item) => item.state === "not shown complete").map((item) => item.phase);
+		const shown = [
+			`done: ${doneNames.join(", ") || "none"}`,
+			...(skippedNames.length ? [`skipped: ${skippedNames.join(", ")}`] : []),
+			...(openNames.length ? [`${verdict === "landed" ? "not complete" : "not reached"}: ${openNames.join(", ")}`] : []),
+		].join("; ");
 		const back = summary.back.length ? `; back ${summary.back.join(", ")}` : "";
 		const text = `Loop closed (${verdict}): phases ${shown}; ${summary.reviewTrend}; diff ${diff.summary.split("\n").join("; ")}${back}.${tail}`;
 		const after = notice ? `\n${notice}` : "";
@@ -408,14 +423,16 @@ export default function (pi: ExtensionAPI) {
 		const exit = bashExit(event);
 		const last = lastLine(output);
 		const anchor = anchorCommand(book.entries);
-		if (anchor && command.includes(anchor)) {
+		if (anchor && command.includes(anchorSegment(anchor))) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
 			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
-			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
+			if (typeof task.anchor === "string" && command.includes(anchorSegment(task.anchor))) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
 		}
 		if (exit === 0 && /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.test(command) && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
+			const named = /\bgit\s+-C\s+(\S+)/.exec(command)?.[1] ?? /\bcd\s+(\S+)/.exec(command)?.[1];
+			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), named ?? "."));
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {

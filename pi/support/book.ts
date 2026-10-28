@@ -545,6 +545,15 @@ export function touchRepo(book: Book, path: string): boolean {
 	return true;
 }
 
+/** Adds the repo at `dir` with its pre-command HEAD (`ORIG_HEAD`) after a merge, pull, or cherry-pick first seen through bash. */
+export function touchRepoBeforeMerge(book: Book, dir: string): boolean {
+	const found = repoOf(join(dir, "_"));
+	if (!found || bases(book.entries).some((base) => base.repo === found.repo)) return false;
+	const origin = git(found.repo, ["rev-parse", "ORIG_HEAD"]);
+	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: origin || found.head }));
+	return true;
+}
+
 export type Diff = { summary: string; files: string[]; paths: string[] };
 
 /** The diff of each base's repo against its recorded HEAD, as one summary line per repo and the changed files. */

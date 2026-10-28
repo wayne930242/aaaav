@@ -103,6 +103,18 @@ class TestAnchorChains(BookCase):
     def test_pipefail_makes_the_exit_code_trustworthy(self):
         self.assertEqual(self.exits("set -o pipefail; pytest -q 2>&1 | tail -3", 1), [1])
 
+    def test_pipefail_counts_anywhere_before_the_anchor(self):
+        self.assertEqual(self.exits("cd /tmp && . .venv/bin/activate && set -o pipefail; pytest -q 2>&1 | tail -3", 1)[-1], 1)
+        self.assertEqual(self.exits("set -euo pipefail; pytest -q 2>&1 | tail -3", 0)[-1], 0)
+        self.assertEqual(self.exits("set -o errexit -o pipefail; pytest -q 2>&1 | tail -3", 1)[-1], 1)
+
+    def test_the_last_occurrence_of_the_anchor_decides(self):
+        self.assertEqual(self.exits("pytest -q; cd main && git merge --ff-only && pytest -q", 1), [1])
+
+    def test_an_anchor_with_an_environment_prefix_matches_on_its_last_segment(self):
+        self.replay([*self.open_loop(anchor=". /tmp/x/.venv/bin/activate && pytest -q"), bash_result("pytest -q", 1, "bad")])
+        self.assertEqual([e["exit"] for e in self.entries("verify")], [1])
+
     def test_or_semicolon_and_later_pipes_after_or_hide_the_anchor_exit(self):
         self.assertEqual(self.exits("pytest -q || true", 0)[-1], "unknown")
         self.assertEqual(self.exits("set -o pipefail; pytest -q || true", 0)[-1], "unknown")
@@ -125,14 +137,14 @@ class TestCloseOutput(BookCase):
         (self.cwd / "app.py").write_text("print(1)\nprint(2)\n")
         out = self.replay([stage(stage="close", verdict="landed")])
         text = text_of(out["results"][-1])
-        self.assertIn("phases anchor done, act done, verify done, reflect skipped (nothing to reflect)", text)
+        self.assertIn("phases done: anchor, act, verify; skipped: reflect (nothing to reflect)", text)
         self.assertIn("diff work: 1 file changed", text)
         self.assertNotIn("other:", text)
         self.assertNotIn("untracked", text)
 
     def test_automatic_skips_are_marked_and_the_phase_list_goes_into_the_session_entry(self):
         out = self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok"), stage(stage="close", verdict="landed")])
-        self.assertIn("reflect auto-skipped (no friction)", text_of(out["results"][-1]))
+        self.assertIn("skipped: reflect (no friction)", text_of(out["results"][-1]))
         phases = out["appended"][0]["data"]["phases"]
         self.assertEqual(phases[-1], {"phase": "reflect", "state": "auto-skipped", "note": "no friction"})
 
