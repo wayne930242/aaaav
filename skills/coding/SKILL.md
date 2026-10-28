@@ -12,7 +12,7 @@ Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md) with one of the
 Before the first production edit, declare the change **Inline** or **Durable**:
 
 - **Inline:** requirements and approach are clear, impact is bounded, and implementation and verification fit this run; a lasting behavior or public contract can still be Inline when the change is simple. Follow Alignment with `Inline — Contract: <one sentence of the observable behavior after the change>`; the user's source-change request approves it, and approval already given is not asked again.
-- **Durable:** the work needs a persistent design record because of material ambiguity, consequential trade-offs, cross-component coordination, migration risk, continuity across sessions, or a user-requested spec. Read [MINI-SDD.md](MINI-SDD.md) and create or resume its folder, which keeps no `tasks.md`; Spec waits for the user's approval before any production edit.
+- **Durable:** the work needs a persistent design record because of material ambiguity, consequential trade-offs, cross-component coordination, migration risk, or a user-requested spec. Read [MINI-SDD.md](MINI-SDD.md) and create or resume its folder, which keeps no `tasks.md`; Spec waits for the user's approval before any production edit.
 
 ## Anchor
 
