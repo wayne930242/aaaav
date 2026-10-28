@@ -53,6 +53,8 @@ Inside an open loop, each `todo` create or update is recorded as a task entry ca
 - `ref`: one or more `<path>#<heading>` pointers into a spec, design, or other doc. The book resolves each heading to its current line range when recording (`spec.md#Second thought → L88-L101`) and re-resolves at `read`; a heading that no longer exists shows `missing`.
 - `followup`: as in Loop lifecycle.
 
+The Jev state includes this task list with a one-line legend (`#id status subject — anchor (last exit) — ref → line range; missing = heading gone`), so Jev can judge each task's own anchor and spec coverage.
+
 `read` lists each task as `#id status subject — anchor — refs (line ranges)` and, when a bash call matched a task's own `anchor`, its last exit code. A task in an `inline`, `reviewed`, or `durable` loop without `anchor` or `ref` is recorded as is; no warning. The skill text names the keys in one line where `todo` is introduced.
 
 ### Durable artifacts recorded automatically
