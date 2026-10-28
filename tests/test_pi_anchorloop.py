@@ -1,166 +1,73 @@
-"""Loads the anchorloop loop extensions with a stub pi API and replays events against them."""
+"""The anchor gate, the decision trail tool, and the Jev second thought, replayed against stub pi events."""
 
-import json
-import os
-import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-PI_DIR = Path(__file__).resolve().parent.parent / "pi"
-
-# Replays steps against the registered handlers and prints what the extension returned.
-HARNESS = """
-import { registerHooks } from "node:module";
-// pi provides its own package to extensions; the stub carries the one value export they use.
-const PI_STUB = String.raw`export function parseSkillBlock(text) {
-  const match = text.match(/^<skill name="([^"]+)" location="([^"]+)">\\n([\\s\\S]*?)\\n<\\/skill>(?:\\n\\n([\\s\\S]+))?$/);
-  return match ? { name: match[1], location: match[2], content: match[3], userMessage: match[4]?.trim() || undefined } : null;
-}`;
-registerHooks({
-  resolve: (specifier, context, next) =>
-    specifier === "@earendil-works/pi-coding-agent"
-      ? { url: "data:text/javascript," + encodeURIComponent(PI_STUB), shortCircuit: true }
-      : next(specifier, context),
-});
-const [extensionUrl, cwd, stepsJson, branchJson, classifyJson] = process.argv.slice(1);
-const { default: register } = await import(extensionUrl);
-const handlers = {};
-const tools = {};
-register({
-  on: (event, fn) => { handlers[event] = fn; },
-  registerTool: (tool) => { tools[tool.name] = tool; },
-});
-const classifyPlan = JSON.parse(classifyJson);
-const out = { results: [], classifyCalls: [], checkpointQuestions: [], notices: [] };
-const ctx = {
-  cwd,
-  ui: { notify: (message, level) => out.notices.push({ step: out.results.length, message, level }) },
-  sessionManager: { getBranch: () => JSON.parse(branchJson) },
-  modelRegistry: {
-    findOfType: (...args) => {
-      out.findArgs = args;
-      return classifyPlan === "missing" ? undefined : { id: "jev-latest" };
-    },
-    hasConfiguredAuth: () => classifyPlan !== "no-auth",
-    classify: async (_model, context) => {
-      out.classifyCalls.push(context.state);
-      out.checkpointQuestions.push(context.questions.checkpoint);
-      if (classifyPlan === "throw") throw new Error("network down");
-      return classifyPlan;
-    },
-  },
-};
-for (const step of JSON.parse(stepsJson)) {
-  try {
-    const result = step.tool
-      ? await tools[step.tool].execute("t1", step.params, undefined, undefined, ctx)
-      : await handlers[step.event]?.(step.payload ?? {}, ctx);
-    out.results.push(result ?? null);
-  } catch (error) {
-    out.results.push({ error: error.message });
-  }
-}
-console.log(JSON.stringify(out));
-"""
-
-
-def user_start(prompt: str = "fix the export") -> dict:
-    return {"event": "message_end", "payload": {"message": {"role": "user", "content": [{"type": "text", "text": prompt}]}}}
-
-
-def assistant(text: str) -> dict:
-    return {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}}
-
-
-def tool_call(tool: str, path: str = "src/app.py") -> dict:
-    return {"event": "tool_call", "payload": {"toolName": tool, "toolCallId": "c1", "input": {"path": path, "command": "pytest"}}}
-
-
-def typed(source: str, text: str = "x") -> dict:
-    return {"event": "input", "payload": {"text": text, "source": source}}
-
-
-SETTLED = {"event": "agent_settled", "payload": {"aborted": False}}
-AGENT_START = {"event": "agent_start", "payload": {}}
-
-SETTLE = {"event": "agent_before_settle", "payload": {"outcome": "completed", "entries": [], "continue": False}}
-
-
-def answers(done: float, review: str, quality: float, checkpoint: float = 0.9) -> dict:
-    return {
-        "stopReason": "stop",
-        "answers": {
-            "checkpoint": {"type": "bool", "probability": checkpoint},
-            "done": {"type": "bool", "probability": done},
-            "review": {"type": "choice", "choice": review, "probabilities": {review: 0.6}, "confidence": 0.4},
-            "quality": {"type": "score", "score": quality, "confidence": 0.5},
-        },
-    }
-
-
-@unittest.skipUnless(shutil.which("node"), "node is required to load the pi extensions")
-class ExtensionCase(unittest.TestCase):
-    extension = ""
-
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.cwd = Path(self.temp_dir.name)
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def replay(self, steps: list[dict], branch: list | None = None, classify: object = None, env: dict | None = None) -> dict:
-        # A suite run inside a subagent must not inherit its markers.
-        base = {key: value for key, value in os.environ.items() if not key.startswith("PI_SUBAGENT_")}
-        proc = subprocess.run(
-            ["node", "--input-type=module", "-e", HARNESS, (PI_DIR / self.extension).as_uri(), str(self.cwd),
-             json.dumps(steps), json.dumps(branch or []), json.dumps(classify)],
-            capture_output=True,
-            text=True,
-            env={**base, **(env or {})},
-        )
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        return json.loads(proc.stdout.strip().splitlines()[-1])
+from tests.pi_harness import (
+    SETTLE,
+    SETTLED,
+    ExtensionCase,
+    assistant,
+    bash_result,
+    stage,
+    todo_create,
+    todo_state,
+    tool_call,
+    tool_result,
+    user_start,
+)
 
 
 class TestAnchorGate(ExtensionCase):
-    extension = "anchor-gate.ts"
+    extensions = ("book.ts", "anchor-gate.ts")
 
-    def warned_steps(self, out: dict) -> list[int]:
+    def warned_steps(self, out: dict, mention: str = "Reality anchor:") -> list[int]:
         for notice in out["notices"]:
             self.assertEqual(notice["level"], "warning")
-            self.assertIn("Reality anchor:", notice["message"])
+            self.assertIn(mention, notice["message"])
         return [notice["step"] for notice in out["notices"]]
 
-    def test_edit_without_anchor_warns_once_per_user_message_and_never_blocks(self):
-        out = self.replay([
-            {"event": "session_start"},
-            user_start(),
-            tool_call("edit"),
-            tool_call("write"),
-            user_start("now the import"),
-            tool_call("edit"),
-        ])
-        self.assertEqual(out["results"], [None] * 6)
-        self.assertEqual(self.warned_steps(out), [2, 5])
+    def loop(self, kind: str | None = "inline") -> list[dict]:
+        steps = [{"event": "session_start"}, user_start(), todo_create()]
+        return steps + ([stage(stage="kind", kind=kind, intent="x")] if kind else [])
 
-    def test_anchor_line_silences_the_warning_until_the_next_user_prompt(self):
+    def test_without_an_open_loop_nothing_is_gated(self):
+        out = self.replay([{"event": "session_start"}, user_start(), tool_call("edit"), tool_call("write")])
+        self.assertEqual(out["notices"], [])
+
+    def test_in_a_loop_an_edit_without_an_anchor_warns_once_per_user_message_and_never_blocks(self):
+        out = self.replay([*self.loop(), tool_call("edit"), tool_call("write"), user_start("now the import"), tool_call("edit")])
+        self.assertEqual(out["results"][4:], [None, None, None, None])
+        self.assertEqual(self.warned_steps(out), [4, 7])
+
+    def test_an_edit_before_the_kind_is_declared_is_gated_like_inline(self):
+        self.assertEqual(self.warned_steps(self.replay([*self.loop(None), tool_call("edit")])), [3])
+
+    def test_a_quick_loop_is_not_gated(self):
+        self.assertEqual(self.replay([*self.loop("quick"), tool_call("edit")])["notices"], [])
+
+    def test_the_anchor_line_silences_the_warning_until_the_next_user_prompt(self):
         out = self.replay([
-            {"event": "session_start"},
-            user_start(),
+            *self.loop(),
             assistant("Alignment: fix it.\nReality anchor: pytest tests/test_export.py"),
             tool_call("write"),
             user_start("now the import"),
             tool_call("write"),
         ])
-        self.assertEqual(self.warned_steps(out), [5])
+        self.assertEqual(self.warned_steps(out), [7])
+
+    def test_an_anchor_stage_counts_as_the_anchor_for_the_whole_loop(self):
+        out = self.replay([*self.loop(), stage(stage="anchor", check="pytest"), tool_call("edit"), user_start("again"), tool_call("edit")])
+        self.assertEqual(out["notices"], [])
+
+    def test_a_skipped_anchor_stage_counts_too(self):
+        self.assertEqual(self.replay([*self.loop(), stage(stage="anchor", skip="no check exists"), tool_call("edit")])["notices"], [])
 
     def test_text_and_html_files_scratch_specs_temp_paths_and_other_tools_pass(self):
         out = self.replay([
-            {"event": "session_start"},
-            user_start(),
+            *self.loop(),
             tool_call("write", "README.md"),
             tool_call("edit", "notes/todo.TXT"),
             tool_call("write", "report/index.html"),
@@ -173,28 +80,54 @@ class TestAnchorGate(ExtensionCase):
         self.assertEqual(out["notices"], [])
 
     def test_a_user_message_that_steers_the_running_loop_rearms_the_warning(self):
-        out = self.replay([
-            {"event": "session_start"},
-            user_start(),
-            assistant("Reality anchor: pytest"),
-            user_start("also rename it"),
-            tool_call("edit"),
-        ])
-        self.assertEqual(self.warned_steps(out), [4])
+        out = self.replay([*self.loop(), assistant("Reality anchor: pytest"), user_start("also rename it"), tool_call("edit")])
+        self.assertEqual(self.warned_steps(out), [6])
 
     def test_resumed_session_ignores_an_anchor_stated_before_the_last_user_message(self):
         branch = [
             {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest"}]}},
             {"type": "message", "message": {"role": "user", "content": "now the import"}},
         ]
-        self.assertEqual(self.warned_steps(self.replay([{"event": "session_start"}, tool_call("edit")], branch)), [1])
+        out = self.replay([{"event": "session_start"}, todo_create(), tool_call("edit")], branch=branch)
+        self.assertEqual(self.warned_steps(out), [2])
 
     def test_resumed_session_keeps_an_anchor_stated_after_the_last_user_message(self):
         branch = [
             {"type": "message", "message": {"role": "user", "content": "fix it"}},
             {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest"}]}},
         ]
-        self.assertEqual(self.replay([{"event": "session_start"}, tool_call("edit")], branch)["notices"], [])
+        self.assertEqual(self.replay([{"event": "session_start"}, todo_create(), tool_call("edit")], branch=branch)["notices"], [])
+
+    def spec(self, status: str) -> None:
+        path = self.cwd / "docs" / "specs" / "2026-10-29-x" / "spec.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"Status: {status}\n\n# Spec\n")
+
+    def durable(self) -> list[dict]:
+        return [*self.loop("durable"), stage(stage="anchor", check="pytest"),
+                tool_result("write", {"path": "docs/specs/2026-10-29-x/spec.md"})]
+
+    def test_a_durable_production_edit_warns_once_while_the_spec_is_not_approved(self):
+        self.spec("proposed")
+        out = self.replay([*self.durable(), tool_call("edit"), tool_call("edit", "src/b.py")])
+        self.assertEqual(self.warned_steps(out, "Status: approved"), [6])
+
+    def test_a_durable_production_edit_with_an_approved_spec_is_silent(self):
+        self.spec("approved")
+        self.assertEqual(self.replay([*self.durable(), tool_call("edit")])["notices"], [])
+
+    def test_a_durable_loop_with_no_recorded_spec_warns(self):
+        out = self.replay([*self.loop("durable"), stage(stage="anchor", check="pytest"), tool_call("edit")])
+        self.assertEqual(self.warned_steps(out, "Status: approved"), [5])
+
+    def test_spec_and_doc_edits_in_a_durable_loop_are_not_production_edits(self):
+        self.spec("proposed")
+        out = self.replay([*self.durable(), tool_call("edit", "docs/specs/2026-10-29-x/design.md"), tool_call("write", "notes.md")])
+        self.assertEqual(out["notices"], [])
+
+    def test_an_inline_loop_ignores_the_spec_gate(self):
+        self.spec("proposed")
+        self.assertEqual(self.replay([*self.loop(), stage(stage="anchor", check="x"), tool_call("edit")])["notices"], [])
 
 
 class TestDecisionTool(ExtensionCase):
@@ -236,162 +169,170 @@ class TestDecisionTool(ExtensionCase):
 
 
 class TestSecondThought(ExtensionCase):
-    extension = "second-thought.ts"
+    extensions = ("book.ts", "second-thought.ts")
 
-    def run_turn(self, classify: object, extra: list[dict] | None = None) -> dict:
-        steps = [user_start(), tool_call("bash"), assistant("Done, tests pass."), SETTLE, *(extra or [])]
-        return self.replay(steps, classify=classify)
+    def loop(self, kind: str = "inline", *more: dict) -> list[dict]:
+        return [user_start(), todo_create(), stage(stage="kind", kind=kind, intent="fix the export"), stage(stage="anchor", check="pytest -q"), *more]
 
-    def test_disagreement_continues_once_with_a_visible_message(self):
-        out = self.run_turn(answers(0.11, "focused", 0.63), [assistant("Rechecked: 1 test fails."), SETTLE])
-        first, second = out["results"][3], out["results"][5]
-        self.assertTrue(first["continue"])
-        self.assertEqual([entry["type"] for entry in first["entries"]], ["custom", "custom_message"])
-        self.assertIn("done 0.11", first["entries"][1]["content"])
-        self.assertIsNone(second)
-        self.assertEqual(out["classifyCalls"], [{"request": "fix the export", "trigger": "user", "wake": "", "reply": "Done, tests pass."}])
+    def settle_after(self, classify: object, *more: dict, kind: str = "inline", extra: list[dict] | None = None) -> dict:
+        return self.replay([*self.loop(kind, *more), SETTLE, *(extra or [])], classify=classify)
 
-    def test_full_review_tier_alone_is_a_concern(self):
-        out = self.run_turn(answers(0.9, "full", 2.8))
-        self.assertIn("full independent review", out["results"][3]["entries"][1]["content"])
+    def test_without_a_loop_nothing_is_asked_or_recorded(self):
+        out = self.replay([user_start(), tool_call("bash"), assistant("Done."), SETTLE], classify=answers("close", 0.9, "none", 2.9))
+        self.assertIsNone(out["results"][3])
+        self.assertEqual(out["classifyCalls"], [])
 
-    def test_agreement_records_the_numbers_without_continuing(self):
-        result = self.run_turn(answers(0.84, "none", 2.88))["results"][3]
+    def test_jev_sees_only_the_book_state_and_asks_the_next_stage_with_done_review_quality(self):
+        self.git_repo()
+        (self.cwd / "app.py").write_text("print(1)\nprint(2)\n")
+        todos = todo_state({"subject": "build it", "status": "in_progress", "metadata": {"anchor": "pytest -q", "ref": "docs/x.md#Gone"}},
+                           {"subject": "done", "status": "completed"})
+        out = self.replay([
+            user_start(), todo_create("build it", anchor="pytest -q", ref="docs/x.md#Gone"), todo_create("done", task_id=2, status="completed"),
+            stage(stage="kind", kind="reviewed", intent="fix the export"), stage(stage="anchor", check="pytest -q"),
+            {"event": "tool_call", "payload": {"toolName": "edit", "toolCallId": "e", "input": {"path": "app.py"}}},
+            stage(stage="act"), {"branchAdd": [todos]}, bash_result("pytest -q", 0, "3 passed"), stage(stage="verify"), SETTLE,
+        ], classify=answers("close", 0.9, "none", 2.9))
+        (state,) = out["classifyCalls"]
+        self.assertEqual(sorted(state), ["anchor", "diff", "intent", "kind", "tasks", "todos", "verify"])
+        self.assertEqual((state["kind"], state["intent"], state["anchor"]), ("reviewed", "fix the export", "pytest -q"))
+        self.assertIn("1 file changed", state["diff"])
+        self.assertLessEqual(len(state["diff"]), 1200)
+        self.assertIn("last check: exit 0 — 3 passed", state["verify"])
+        self.assertEqual(state["todos"], "1 open of 2")
+        legend, task = state["tasks"].splitlines()[:2]
+        self.assertEqual(legend, "legend: #id status subject — anchor (last exit) — ref → line range; missing = heading gone")
+        self.assertEqual(out["questionSets"], [["next", "done", "review", "quality"]])
+        self.assertEqual(task, "#1 in_progress build it — pytest -q (exit 0) — docs/x.md#Gone → missing")
+
+    def test_the_message_leads_with_the_suggestion_and_the_book_facts(self):
+        check = [bash_result("pytest -q", 0, "3 passed"), stage(stage="verify")]
+        out = self.settle_after(answers("close", 0.84, "none", 2.88), stage(stage="act"), *check)
+        result = out["results"][-1]
         self.assertNotIn("continue", result)
+        text = result["entries"][1]["content"]
+        self.assertTrue(text.startswith("Second thought (Jev, advisory): next → close (verify exit 0 after the last change, no review, 0 open todos)"), text)
+        self.assertEqual(result["entries"][0]["data"]["next"], "close")
         self.assertEqual(result["entries"][0]["data"]["concerns"], [])
 
-    def test_an_evidenced_reply_near_half_is_not_a_concern(self):
-        result = self.run_turn(answers(0.3, "focused", 2.0))["results"][3]
+    def test_a_verify_suggestion_continues_the_run_once_when_no_verify_follows_the_last_act(self):
+        out = self.replay([*self.loop(), stage(stage="act"), SETTLE, stage(stage="act"), SETTLE], classify=answers("verify", 0.5, "none", 2.5))
+        first, second = out["results"][5], out["results"][7]
+        self.assertTrue(first["continue"])
+        self.assertIn("verify missing", first["entries"][1]["content"])
+        self.assertNotIn("continue", second)
+
+    def test_a_verify_suggestion_does_not_continue_when_a_check_already_follows_the_last_act(self):
+        out = self.settle_after(answers("verify", 0.5, "none", 2.5), stage(stage="act"), bash_result("pytest -q", 0, "ok"), stage(stage="verify"))
+        self.assertNotIn("continue", out["results"][-1])
+
+    def test_a_review_suggestion_continues_only_while_no_review_follows_the_last_act(self):
+        missing = self.settle_after(answers("review", 0.5, "focused", 2.5), stage(stage="act"), kind="reviewed")
+        self.assertTrue(missing["results"][-1]["continue"])
+        reviewed = self.settle_after(answers("review", 0.5, "focused", 2.5), stage(stage="act"),
+                                     stage(stage="review", note="ok"), kind="reviewed")
+        self.assertNotIn("continue", reviewed["results"][-1])
+
+    def test_a_fix_suggestion_continues_while_a_blocking_review_has_no_act_after_it(self):
+        blocked = {"event": "message_end", "payload": {"message": {"role": "custom", "customType": "subagent_result",
+                   "details": {"agent": "reviewer", "name": "r", "resultContent": "Blocking: P0=0 P1=1"}}}}
+        out = self.settle_after(answers("fix", 0.2, "focused", 2.5), stage(stage="act"), blocked, stage(stage="review"), kind="reviewed")
+        self.assertTrue(out["results"][-1]["continue"])
+        fixed = self.settle_after(answers("fix", 0.2, "focused", 2.5), stage(stage="act"), blocked, stage(stage="review"), stage(stage="act"), kind="reviewed")
+        self.assertNotIn("continue", fixed["results"][-1])
+
+    def test_continue_close_and_ask_user_suggestions_never_continue_the_run(self):
+        for choice in ("continue", "close", "ask-user"):
+            out = self.settle_after(answers(choice, 0.5, "none", 2.5), stage(stage="act"))
+            self.assertNotIn("continue", out["results"][-1], choice)
+            self.assertIn(f"next → {choice}", out["results"][-1]["entries"][1]["content"])
+
+    def test_a_run_is_judged_only_when_the_book_gained_an_entry_since_the_last_judgment(self):
+        out = self.replay([*self.loop(), SETTLE, SETTLED, SETTLE, SETTLED, stage(stage="act"), SETTLE],
+                          classify=answers("close", 0.9, "none", 2.9))
+        self.assertIsNotNone(out["results"][4])
+        self.assertIsNone(out["results"][6])
+        self.assertIsNotNone(out["results"][9])
+        self.assertEqual(len(out["classifyCalls"]), 2)
+
+    def test_a_full_rating_is_noted_without_a_recheck_after_a_clean_review_that_follows_the_last_act(self):
+        clean = {"event": "message_end", "payload": {"message": {"role": "custom", "customType": "subagent_result",
+                 "details": {"agent": "reviewer", "name": "r", "resultContent": "**Blocking:** P0=0 P1=0"}}}}
+        out = self.settle_after(answers("close", 0.9, "full", 2.9), stage(stage="act"), clean, stage(stage="review"), kind="reviewed")
+        result = out["results"][-1]
         self.assertNotIn("continue", result)
+        text = result["entries"][1]["content"]
+        self.assertIn("no blocking finding", text)
+        self.assertNotIn("needs full independent review", text)
+        self.assertEqual(result["entries"][0]["data"]["concerns"], [])
+
+    def test_a_full_rating_is_a_concern_when_no_clean_review_follows_the_last_act(self):
+        out = self.settle_after(answers("review", 0.9, "full", 2.9), stage(stage="act"), kind="reviewed")
+        self.assertIn("needs full independent review", out["results"][-1]["entries"][1]["content"])
+
+    def test_low_done_and_quality_are_listed_as_concerns(self):
+        out = self.settle_after(answers("continue", 0.05, "none", 0.5), stage(stage="act"))
+        content = out["results"][-1]["entries"][1]["content"]
+        self.assertIn("evidence not shown to cover the intent", content)
+        self.assertIn("result below the intent", content)
+
+    def test_a_close_tool_result_carries_the_advisory(self):
+        steps = [*self.loop(), stage(stage="act"),
+                 {"event": "tool_call", "payload": {"toolName": "anchorloop_stage", "toolCallId": "c9", "input": {"stage": "close", "verdict": "landed"}}},
+                 stage(stage="close", verdict="landed"),
+                 tool_result("anchorloop_stage", {"stage": "close", "verdict": "landed"}, "Loop closed (landed)", call_id="c9")]
+        out = self.replay(steps, classify=answers("close", 0.9, "none", 2.9))
+        result = out["results"][-1]
+        self.assertEqual(result["content"][0]["text"], "Loop closed (landed)")
+        self.assertIn("Second thought (Jev, advisory): next → close", result["content"][1]["text"])
+        self.assertEqual(out["classifyCalls"][0]["intent"], "fix the export")
+        self.assertEqual(self.book_files(), [])
+
+    def test_a_refused_close_is_not_judged(self):
+        todos = todo_state({"subject": "x", "status": "pending"})
+        steps = [*self.loop(), {"branchAdd": [todos]},
+                 {"event": "tool_call", "payload": {"toolName": "anchorloop_stage", "toolCallId": "c9", "input": {"stage": "close", "verdict": "landed"}}},
+                 tool_result("anchorloop_stage", {"stage": "close"}, "refused", call_id="c9", isError=True)]
+        out = self.replay(steps, classify=answers("close", 0.9, "none", 2.9))
+        self.assertIsNone(out["results"][-1])
+        self.assertEqual(out["classifyCalls"], [])
 
     def test_failure_records_unknown_and_continues_nothing(self):
-        result = self.run_turn("throw")["results"][3]
+        result = self.settle_after("throw", stage(stage="act"))["results"][-1]
         self.assertEqual(result["entries"][0]["data"], {"verdict": "unknown", "reason": "network down"})
         self.assertNotIn("continue", result)
 
-    def test_only_the_request_and_the_reply_are_sent_and_both_are_truncated(self):
-        steps = [user_start("r" * 2000), tool_call("bash"), assistant("y" * 5000), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["findArgs"], ["classifier", "typesafe", "jev-latest"])
-        self.assertEqual(out["classifyCalls"], [{"request": "r" * 1500, "trigger": "user", "wake": "", "reply": "y" * 3000}])
-
-    def test_a_skill_command_sends_the_users_words_not_the_skill_body(self):
-        expanded = '<skill name="coding" location="/Users/me/skills/coding/SKILL.md">\n' + "body " * 500 + "\n</skill>\n\nfix the export"
-        out = self.replay([user_start(expanded), tool_call("edit"), assistant("Done."), SETTLE], classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"][0]["request"], "fix the export")
-
-    def test_a_steering_user_message_is_judged_on_its_own(self):
-        steps = [user_start("first"), tool_call("bash"), assistant("Done first."), SETTLE,
-                 user_start("second"), tool_call("bash"), assistant("Done second."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([call["request"] for call in out["classifyCalls"]], ["first", "second"])
-
-    def test_a_low_done_score_alone_is_shown_without_a_continuation(self):
-        result = self.run_turn(answers(0.05, "focused", 2.5))["results"][3]
-        self.assertNotIn("continue", result)
-        self.assertIn("done 0.05", result["entries"][1]["content"])
-        self.assertNotIn("Recheck", result["entries"][1]["content"])
-
-    def test_a_run_an_extension_message_starts_is_judged_against_the_typed_request(self):
-        steps = [typed("interactive", "ship it"), user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
-                 typed("extension", "New intercom message above."), user_start("New intercom message above."),
-                 tool_call("bash"), assistant("Shipped."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([(call["request"], call["trigger"], call["wake"]) for call in out["classifyCalls"]],
-                         [("ship it", "user", ""), ("ship it", "wake", "New intercom message above.")])
-
-    def test_a_custom_message_that_wakes_a_run_is_sent_as_the_wake(self):
-        def custom(text: str, kind: str = "pi-loop-monitor") -> dict:
-            return {"event": "message_end", "payload": {"message": {"role": "custom", "customType": kind, "content": text}}}
-        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE, SETTLED,
-                 custom("Monitor #2 started"), custom("Monitor #2 done: if on npm, pin it."),
-                 tool_call("bash"), assistant("Pinned."), custom("note", "anchorloop-second-thought"), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "Monitor #2 done: if on npm, pin it.", "reply": "Pinned."}])
-
-    def test_a_wake_run_asks_whether_the_reply_only_answers_a_routine_check(self):
-        def custom(text: str) -> dict:
-            return {"event": "message_end", "payload": {"message": {"role": "custom", "customType": "pi-loop-monitor", "content": text}}}
-        steps = [user_start("ship it"), tool_call("bash"), assistant("Shipped."), SETTLE, SETTLED,
-                 custom("Loop #3 fired. Check worker liveness."), tool_call("bash"), assistant("Worker healthy, load 4.5."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        user_question, wake_question = out["checkpointQuestions"]
-        self.assertNotIn("routine check", user_question["instructions"])
-        self.assertIn("routine check", wake_question["instructions"])
-        self.assertIn("status, health, load, or progress of work that is still running", wake_question["criteria"]["false"])
-
-    def test_a_reply_that_is_not_a_checkpoint_gets_no_reminder(self):
-        result = self.run_turn(answers(0.02, "full", 0.5, checkpoint=0.1))["results"][3]
-        self.assertNotIn("continue", result)
-        self.assertEqual([entry["type"] for entry in result["entries"]], ["custom"])
-        self.assertEqual(result["entries"][0]["data"]["concerns"], [])
-        self.assertEqual(result["entries"][0]["data"]["checkpoint"], 0.1)
-
-    def test_an_extension_input_that_never_lands_does_not_shift_later_messages(self):
-        steps = [typed("extension", "swallowed"), typed("interactive", "ship it"), user_start("ship it"),
-                 tool_call("bash"), assistant("Shipped."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "user", "wake": "", "reply": "Shipped."}])
-
-    def test_an_extension_text_with_surrounding_whitespace_still_matches(self):
-        steps = [user_start("ship it"), tool_call("bash"), assistant("Started."), SETTLE, SETTLED,
-                 typed("extension", "wake\n"), user_start("wake\n"), tool_call("bash"), assistant("Shipped."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual([(call["request"], call["trigger"]) for call in out["classifyCalls"]], [("ship it", "user"), ("ship it", "wake")])
-
-    def test_a_swallowed_extension_text_is_forgotten_once_the_session_settles(self):
-        steps = [typed("extension", "ship it"), SETTLED, user_start("ship it"),
-                 tool_call("bash"), assistant("Shipped."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "user", "wake": "", "reply": "Shipped."}])
-
-    def test_a_recheck_continuation_does_not_ask_again(self):
-        # pi fires agent_start again for the continuation; the recheck runs bash again.
-        steps = [user_start(), AGENT_START, tool_call("bash"), assistant("Done."), SETTLE,
-                 AGENT_START, tool_call("bash"), assistant("Rechecked, tests pass."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "full", 2.9))
-        self.assertTrue(out["results"][4]["continue"])
-        self.assertIsNone(out["results"][8])
-        self.assertEqual(len(out["classifyCalls"]), 1)
-
-    def test_work_before_a_compaction_continuation_still_counts(self):
-        steps = [user_start(), tool_call("edit"), AGENT_START, assistant("Done."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(len(out["classifyCalls"]), 1)
+    def test_without_a_key_or_a_classifier_nothing_is_asked_or_recorded(self):
+        for plan in ("no-auth", "missing"):
+            out = self.settle_after(plan)
+            self.assertIsNone(out["results"][-1], plan)
+            self.assertEqual(out["classifyCalls"], [], plan)
 
     def test_a_run_that_arranged_a_wake_is_not_judged(self):
         for tool in ("MonitorCreate", "subagent"):
-            steps = [user_start(), tool_call("bash"), tool_call(tool), assistant("Waiting on it."), SETTLE]
-            out = self.replay(steps, classify=answers(0.0, "full", 0))
-            self.assertIsNone(out["results"][4], tool)
+            out = self.replay([*self.loop(), tool_call(tool), SETTLE], classify=answers("close", 0.9, "none", 2.9))
+            self.assertIsNone(out["results"][-1], tool)
             self.assertEqual(out["classifyCalls"], [], tool)
 
-    def test_the_run_after_a_wake_is_judged_on_its_own_work(self):
-        steps = [user_start("ship it"), tool_call("MonitorCreate"), assistant("Waiting."), SETTLE, SETTLED,
-                 assistant("Still waiting."), SETTLE, SETTLED,
-                 tool_call("bash"), assistant("Shipped."), SETTLE]
-        out = self.replay(steps, classify=answers(0.9, "none", 2.9))
-        self.assertEqual(out["classifyCalls"], [{"request": "ship it", "trigger": "wake", "wake": "", "reply": "Shipped."}])
-
-    def test_without_a_key_or_a_classifier_nothing_is_asked_or_recorded(self):
-        for plan in ("no-auth", "missing"):
-            out = self.run_turn(plan)
-            self.assertIsNone(out["results"][3], plan)
-            self.assertEqual(out["classifyCalls"], [], plan)
-
     def test_a_subagent_session_is_never_judged(self):
-        steps = [user_start(), tool_call("bash"), assistant("Done, tests pass."), SETTLE]
         markers = [{"PI_SUBAGENT_ID": "child-1"}, {"PI_SUBAGENT_CHILD": "1"},
                    {"PI_SUBAGENT_CHILD_AGENT": "worker", "PI_SUBAGENT_PARENT_PID": "42"}]
         for env in markers:
-            out = self.replay(steps, classify=answers(0.1, "full", 0), env=env)
-            self.assertIsNone(out["results"][3], env)
+            out = self.replay([*self.loop(), SETTLE], classify=answers("verify", 0.1, "full", 0), env=env)
+            self.assertIsNone(out["results"][-1], env)
             self.assertEqual(out["classifyCalls"], [], env)
 
-    def test_a_run_that_changed_nothing_is_not_judged(self):
-        out = self.replay([user_start(), assistant("It works like this."), SETTLE], classify=answers(0.1, "full", 0))
-        self.assertIsNone(out["results"][2])
-        self.assertEqual(out["classifyCalls"], [])
+
+def answers(next_stage: str, done: float, review: str, quality: float) -> dict:
+    return {
+        "stopReason": "stop",
+        "answers": {
+            "next": {"type": "choice", "choice": next_stage, "probabilities": {next_stage: 0.7}},
+            "done": {"type": "bool", "probability": done},
+            "review": {"type": "choice", "choice": review, "probabilities": {review: 0.6}, "confidence": 0.4},
+            "quality": {"type": "score", "score": quality, "confidence": 0.5},
+        },
+    }
 
 
 if __name__ == "__main__":

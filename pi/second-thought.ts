@@ -1,94 +1,102 @@
 /**
- * pi extension: before a run that changed something settles, asks Jev whether the
- * final reply shows the request met, what review it needs, and how good it is.
- * Only what the user typed counts as the request: messages that extensions send
- * (intercom, monitor wakes) do not replace it. A run they start is sent with
- * `trigger: wake` and the message that woke it, and is judged on what that message asks.
- * A run that arranged a wake (a monitor, a loop, a subagent) is waiting, not finished,
- * and is not judged. Jev also says whether the reply is a
- * checkpoint, a point that hands work back to the user; a reply that only acknowledges,
- * reports progress, or waits gets no reminder. A wake run is asked a stricter checkpoint
- * question, since with the general one Jev counts a reply to a routine liveness or health
- * check as handing work back. A wrong review tier or low quality gets one
- * advisory continuation per run; a low done score is only shown. The agent is never
- * blocked. Only the request, the trigger, the wake message, and the final reply are sent.
+ * pi extension: inside an open loop, asks Jev what the agent should do next and whether the
+ * book's evidence covers the loop's intent. Jev sees only what the loop book holds: the kind,
+ * intent, anchor, diff summary, verify state (stages, review rounds, child checks), and open
+ * todo count. It runs when a run settles and the book gained an entry since the last judgment,
+ * and at a `close` declaration. The main output is a next-stage suggestion; the advisory leads
+ * with it and continues the run once, only when the suggestion is verify, review, or fix and the
+ * book shows that stage missing after the last change. A run that arranged a wake (a monitor, a
+ * loop, a subagent) is waiting, not finished, and is not judged. Outside a loop nothing runs.
  * A subagent session registers nothing: the agent that spawned it judges its result.
  */
 
-import { type ExtensionAPI, parseSkillBlock } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	type Book,
+	childLines,
+	currentIntent,
+	currentKind,
+	diffAgainstBases,
+	diffText,
+	isBlocking,
+	isOpenTask,
+	latestAnchor,
+	lastIndex,
+	openBook,
+	replayTodos,
+	reviewClearAfterLastAct,
+	reviewTrend,
+	reviews,
+	stagesDone,
+	TASK_LEGEND,
+	taskLines,
+	verifyAfterLastAct,
+} from "./support/book.ts";
+import { type Answers, classify } from "./support/jev.ts";
+import { isSubagent } from "./support/subagent.ts";
+
+export { isSubagent };
 
 export const ENTRY_TYPE = "anchorloop-second-thought";
-const WORK_TOOLS = new Set(["write", "edit", "bash"]);
 const WAIT_TOOLS = new Set(["MonitorCreate", "LoopCreate", "goal_wait", "subagent", "subagent_resume", "subagent_send"]);
-const REQUEST_CHARS = 1500;
-const WAKE_CHARS = 1500;
-const REPLY_CHARS = 3000;
-const TIMEOUT_MS = 15_000;
 
-export const THRESHOLDS = { checkpointBelow: 0.5, doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
+export const THRESHOLDS = { doneBelow: 0.25, qualityBelow: 1.5, reviewTier: "full" };
+
+export const NEXT_STAGES = ["continue", "verify", "review", "fix", "close", "ask-user"] as const;
+export type Next = (typeof NEXT_STAGES)[number];
 
 export const QUESTIONS = {
-	checkpoint: {
-		type: "bool" as const,
+	next: {
+		type: "choice" as const,
 		instructions:
-			"Is `reply` a point where the agent hands work back to the user? `trigger` is `user` when the user's message started this run and `wake` when an automated message (a monitor, a loop, another agent) did.",
+			"What should the agent do next in this loop? `kind` is the loop kind, `intent` what it delivers, `anchor` the check that observes the result, `diff` what changed, `verify` the stages, check evidence, and reviews recorded so far, `todos` the open count, and `tasks` each work item with its own anchor, last exit code, and spec references.",
 		criteria: {
-			true: "the reply delivers a result, reports the request finished or blocked, or asks the user to decide",
-			false: "the reply only acknowledges a message, reports interim progress, or says the agent is waiting on something it started",
+			continue: "work on the intent remains to be done",
+			verify: "the change was made or altered after the last check, or no check observed the anchor",
+			review: "the kind or the diff needs an independent review that is not recorded, or the last one predates the last change",
+			fix: "a recorded check or review shows a failure or a blocking finding that is not yet fixed",
+			close: "the verify evidence covers the intent, any needed review is clear, and no todo is open",
+			"ask-user": "a decision or judgment that belongs to the user blocks progress",
 		},
 	},
 	done: {
 		type: "bool" as const,
-		instructions:
-			"Does `reply` show, with evidence, that the work this run took on is fully met? That work is `request`, or, when `trigger` is `wake`, what `wake` asks in service of `request`.",
+		instructions: "Does the `verify` evidence show, with observed results, that `intent` is fully met?",
 		criteria: {
-			true: "every part of the request has observed evidence in the reply: command output, a test result, or an artifact",
+			true: "every part of the intent has observed evidence: command output, a test result, a review verdict, or an artifact",
 			false: "some part failed, was skipped, is left for later, or rests only on a claim",
 		},
 	},
 	review: {
 		type: "choice" as const,
-		instructions: "What review should the change described in `reply` get before it is merged or released?",
+		instructions: "What review should the `diff` still get before it is merged or released, given the reviews recorded in `verify`?",
 		criteria: {
-			none: "trivial, fully covered by a passing check",
+			none: "trivial, fully covered by a passing check, or already reviewed with no blocking finding",
 			focused: "one independent reviewer on the changed lines",
 			full: "independent review plus an adversarial pass: security, data, permissions, migration, or a shared contract",
 		},
 	},
 	quality: {
 		type: "score" as const,
-		instructions: "How acceptable is the delivered work against the work this run took on: `request`, or `wake` when `trigger` is `wake`?",
+		instructions: "How acceptable is the work recorded in the loop against its `intent`?",
 		criteria: [
 			"unacceptable: wrong or broken",
 			"weak: works but misses requirements",
-			"acceptable: meets the request",
+			"acceptable: meets the intent",
 			"strong: meets it with direct evidence and no excess",
 		],
 	},
 };
 
-// Replayed on the 26 wake-run advisories of one long session, this question let through 1 of
-// the 21 status or liveness replies instead of all 21, and 3 of the 5 delivered results.
-export const WAKE_CHECKPOINT = {
-	type: "bool" as const,
-	instructions:
-		"Is `reply` a point where the agent hands work back to the user? `trigger` is `user` when the user's message started this run and `wake` when an automated message (a monitor, a loop, another agent) did; `wake` is that message. A reply to a routine check that `wake` asked for is not a checkpoint.",
-	criteria: {
-		true: "the reply delivers a finished result or artifact, reports the user's request finished or blocked, or asks the user to decide",
-		false: "the reply acknowledges a message, reports the status, health, load, or progress of work that is still running, or says the agent is waiting on something",
-	},
-};
-
-type Block = { type: string; text?: string };
-type Answers = Record<string, { type: string; probability?: number; choice?: string; probabilities?: Record<string, number>; score?: number }>;
-export type Verdict = { checkpoint: number; done: number; review: string; reviewProbability: number; quality: number };
+export type Verdict = { next: Next; done: number; review: string; reviewProbability: number; quality: number };
 
 export function readVerdict(answers: Answers): Verdict | undefined {
-	const { checkpoint, done, review, quality } = answers;
-	if (checkpoint?.type !== "bool" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
+	const { next, done, review, quality } = answers;
+	if (next?.type !== "choice" || done?.type !== "bool" || review?.type !== "choice" || quality?.type !== "score") return undefined;
+	if (!(NEXT_STAGES as readonly string[]).includes(next.choice ?? "")) return undefined;
 	const choice = review.choice ?? "";
 	return {
-		checkpoint: checkpoint.probability ?? 0,
+		next: next.choice as Next,
 		done: done.probability ?? 0,
 		review: choice,
 		reviewProbability: review.probabilities?.[choice] ?? 0,
@@ -96,147 +104,147 @@ export function readVerdict(answers: Answers): Verdict | undefined {
 	};
 }
 
-export function concerns(verdict: Verdict): string[] {
+export type Snapshot = {
+	state: Record<string, string>;
+	/** The book facts that back the suggestion, in a few words. */
+	facts: string;
+	/** A review recorded after the last act with no blocking finding on it. */
+	reviewClear: boolean;
+	/** The stage the book shows missing after the last act, if any. */
+	missing: Next[];
+};
+
+export function snapshot(book: Book, ctx: { cwd: string; sessionManager: { getBranch(): unknown[] } }): Snapshot {
+	const { entries } = book;
+	const todos = replayTodos(ctx.sessionManager.getBranch());
+	const open = todos.filter(isOpenTask).length;
+	const check = verifyAfterLastAct(entries);
+	const rounds = reviews(entries);
+	const lastReview = rounds.at(-1);
+	const missing: Next[] = [];
+	if (!check) missing.push("verify");
+	if (lastIndex(entries, "review") <= lastIndex(entries, "act")) missing.push("review");
+	if (lastReview && isBlocking(lastReview) && lastIndex(entries, "act") < lastIndex(entries, "review")) missing.push("fix");
+	const facts = [
+		check ? `verify ${check.skip ? "skipped" : `exit ${check.exit ?? "unknown"}`} after the last change` : "no verify after the last change",
+		lastReview ? `review r${rounds.length} ${lastReview.blocking === true ? "blocking" : lastReview.blocking === false ? "clear" : "unknown"}` : "no review",
+		`${open} open todo${open === 1 ? "" : "s"}`,
+	].join(", ");
+	const verify = [
+		`stages: ${stagesDone(entries).join(", ") || "none"}`,
+		`last check: ${check ? `exit ${check.exit ?? "unknown"}${check.last ? ` — ${check.last}` : ""}` : "none after the last change"}`,
+		`reviews: ${reviewTrend(entries)}`,
+		...childLines(entries).map((line) => `child ${line}`),
+	].join("; ");
+	return {
+		state: {
+			kind: currentKind(entries) ?? "not declared",
+			intent: (currentIntent(entries) ?? "not declared").slice(0, 500),
+			anchor: (latestAnchor(entries) ?? "none").slice(0, 500),
+			diff: diffText(diffAgainstBases(entries)),
+			verify: verify.slice(0, 1200),
+			todos: `${open} open of ${todos.length}`,
+			tasks: [`legend: ${TASK_LEGEND}`, ...taskLines(entries, todos, ctx.cwd)].join("\n").slice(0, 1500),
+		},
+		facts,
+		reviewClear: reviewClearAfterLastAct(entries),
+		missing,
+	};
+}
+
+export function assess(verdict: Verdict, reviewClear: boolean): { found: string[]; notes: string[] } {
 	const found: string[] = [];
-	if (verdict.checkpoint < THRESHOLDS.checkpointBelow) return found;
-	if (verdict.done < THRESHOLDS.doneBelow) found.push("request not shown met");
-	if (verdict.review === THRESHOLDS.reviewTier) found.push("needs full independent review");
-	if (verdict.quality < THRESHOLDS.qualityBelow) found.push("result below the request");
-	return found;
+	const notes: string[] = [];
+	if (verdict.done < THRESHOLDS.doneBelow) found.push("evidence not shown to cover the intent");
+	if (verdict.review === THRESHOLDS.reviewTier) {
+		if (reviewClear) notes.push("review rated full, but a review recorded after the last change found no blocking finding");
+		else found.push("needs full independent review");
+	}
+	if (verdict.quality < THRESHOLDS.qualityBelow) found.push("result below the intent");
+	return { found, notes };
 }
 
-export function needsRecheck(verdict: Verdict): boolean {
-	return verdict.review === THRESHOLDS.reviewTier || verdict.quality < THRESHOLDS.qualityBelow;
+/** The stage to continue the run with: the suggestion, only when the book shows it missing after the last act. */
+export function continues(verdict: Verdict, snap: Snapshot): boolean {
+	return (verdict.next === "verify" || verdict.next === "review" || verdict.next === "fix") && snap.missing.includes(verdict.next);
 }
 
-export function message(verdict: Verdict, found: string[], recheck: boolean): string {
+export function message(verdict: Verdict, snap: Snapshot, found: string[], notes: string[]): string {
+	const extra = [...found, ...notes];
 	return (
-		`Second thought (Jev, advisory): done ${verdict.done.toFixed(2)}, review ${verdict.review}, ` +
-		`quality ${verdict.quality.toFixed(2)}/3; ${found.join("; ")}.` +
-		(recheck ? " Recheck your evidence; continue only if it fails." : "") +
-		" No reply needed. Clear finished or stale todos; continue any unfinished work."
+		`Second thought (Jev, advisory): next → ${verdict.next} (${snap.facts}); ` +
+		`done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
+		`${extra.length ? `; ${extra.join("; ")}` : ""}.` +
+		(continues(verdict, snap) ? ` The book shows ${verdict.next} missing: do it now, or say why it does not apply.` : "") +
+		" No reply needed."
 	);
-}
-
-function text(content: unknown): string {
-	if (typeof content === "string") return content.trim();
-	if (!Array.isArray(content)) return "";
-	return (content as Block[])
-		.filter((block) => block.type === "text")
-		.map((block) => block.text ?? "")
-		.join("\n")
-		.trim();
-}
-
-// pi-herdr-agents marks its children with PI_SUBAGENT_ID, pi-subagents with PI_SUBAGENT_CHILD,
-// and avtc's pi-subagent with PI_SUBAGENT_CHILD_AGENT plus PI_SUBAGENT_PARENT_PID.
-export function isSubagent(env: NodeJS.ProcessEnv = process.env): boolean {
-	return Boolean(env.PI_SUBAGENT_ID) || env.PI_SUBAGENT_CHILD === "1" || Boolean(env.PI_SUBAGENT_CHILD_AGENT && env.PI_SUBAGENT_PARENT_PID);
 }
 
 export default function (pi: ExtensionAPI) {
 	if (isSubagent()) return;
-	let request = "";
-	let reply = "";
-	let worked = false;
 	let waiting = false;
-	let asked = false;
-	// A run is `user` once a message the user typed lands in it; otherwise a wake started it.
-	let trigger: "user" | "wake" = "wake";
-	// The automated message that started a wake run: the last one to land before the run's first reply.
-	let wake = "";
-	// Texts extensions sent as user messages that have not landed yet; matched by content,
-	// since another handler may swallow an input or a queue may be cleared before it lands.
-	const sent = new Map<string, number>();
+	let continued = false;
+	// Entries each open book held when it was last judged.
+	const judged = new Map<string, number>();
+	// A close deletes its book, so what Jev needs is read when the call starts.
+	const closing = new Map<string, Snapshot>();
 
 	pi.on("session_start", () => {
-		sent.clear();
+		judged.clear();
+		closing.clear();
 	});
 
-	pi.on("input", (event) => {
-		if (event.source !== "extension") return;
-		const said = event.text.trim();
-		sent.set(said, (sent.get(said) ?? 0) + 1);
-	});
-
-	// Each run is judged once, on its own work. State resets once the session settles, so a
-	// continuation (this extension's recheck, or one after compaction) stays in the same run.
-	// An extension text still pending then was swallowed or dropped and will not land.
 	pi.on("agent_settled", () => {
-		sent.clear();
-		reply = "";
-		worked = false;
 		waiting = false;
-		asked = false;
-		trigger = "wake";
-		wake = "";
+		continued = false;
 	});
 
-	pi.on("tool_call", (event) => {
-		if (WORK_TOOLS.has(event.toolName)) worked = true;
+	pi.on("tool_call", (event, ctx) => {
 		if (WAIT_TOOLS.has(event.toolName)) waiting = true;
+		if (event.toolName !== "anchorloop_stage" || (event.input as { stage?: unknown }).stage !== "close") return;
+		const book = openBook(ctx);
+		if (book) closing.set(event.toolCallId, snapshot(book, ctx));
 	});
 
-	// A message the user typed, including one that steers a running loop, starts a new request.
-	pi.on("message_end", (event) => {
-		const msg = event.message as { role?: string; content?: unknown; customType?: string };
-		const said = text(msg.content);
-		if (msg.role === "custom") {
-			if (msg.customType !== ENTRY_TYPE && !reply && said) wake = said;
-		} else if (msg.role === "user") {
-			const pending = sent.get(said) ?? 0;
-			if (pending > 0) {
-				if (pending === 1) sent.delete(said);
-				else sent.set(said, pending - 1);
-				if (!reply) wake = said;
-				return;
-			}
-			const skill = parseSkillBlock(said);
-			request = skill ? (skill.userMessage ?? `/skill:${skill.name}`) : said;
-			reply = "";
-			worked = false;
-			asked = false;
-			trigger = "user";
-			wake = "";
-		} else if (msg.role === "assistant" && said) {
-			reply = said;
-		}
+	async function judge(ctx: Parameters<typeof classify>[0], snap: Snapshot) {
+		const { answers, reason } = await classify(ctx, snap.state, QUESTIONS);
+		if (reason === "no-auth") return undefined;
+		return { verdict: answers ? readVerdict(answers) : undefined, reason };
+	}
+
+	pi.on("tool_result", async (event, ctx) => {
+		const snap = closing.get(event.toolCallId);
+		if (!snap) return;
+		closing.delete(event.toolCallId);
+		if (event.isError) return;
+		const judgment = await judge(ctx, snap);
+		if (!judgment?.verdict) return;
+		const { found, notes } = assess(judgment.verdict, snap.reviewClear);
+		pi.appendEntry(ENTRY_TYPE, { ...judgment.verdict, at: "close", concerns: found });
+		return { content: [...event.content, { type: "text" as const, text: message(judgment.verdict, snap, found, notes) }] };
 	});
 
 	pi.on("agent_before_settle", async (event, ctx) => {
-		if (asked || !worked || waiting || !reply || !request || event.outcome !== "completed") return;
-		asked = true;
+		if (waiting || event.outcome !== "completed") return;
+		const book = openBook(ctx);
+		if (!book) return;
+		const id = String(book.header.id);
+		if (book.entries.length <= (judged.get(id) ?? 0)) return;
+		judged.set(id, book.entries.length);
+		const snap = snapshot(book, ctx);
+		const judgment = await judge(ctx, snap);
+		if (!judgment) return;
 		const record = (data: Record<string, unknown>) => ({ type: "custom" as const, customType: ENTRY_TYPE, data });
-		const jev = ctx.modelRegistry.findOfType("classifier", "typesafe", "jev-latest");
-		type AuthModel = Parameters<typeof ctx.modelRegistry.hasConfiguredAuth>[0];
-		// SAFETY: hasConfiguredAuth is typed for chat models but reads only `provider`, which a classifier has too.
-		if (!jev || !ctx.modelRegistry.hasConfiguredAuth(jev as unknown as AuthModel)) return;
-		let verdict: Verdict | undefined;
-		let reason = "";
-		try {
-			const result = await ctx.modelRegistry.classify(
-				jev,
-				{
-					state: { request: request.slice(0, REQUEST_CHARS), trigger, wake: wake.slice(0, WAKE_CHARS), reply: reply.slice(-REPLY_CHARS) },
-					questions: trigger === "wake" ? { ...QUESTIONS, checkpoint: WAKE_CHECKPOINT } : QUESTIONS,
-				},
-				{ signal: AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), ...(ctx.signal ? [ctx.signal] : [])]) },
-			);
-			verdict = result.stopReason === "stop" ? readVerdict(result.answers as Answers) : undefined;
-			reason = result.stopReason;
-		} catch (error) {
-			reason = error instanceof Error ? error.message : String(error);
-		}
-		if (!verdict) return { entries: [record({ verdict: "unknown", reason })] };
-		const found = concerns(verdict);
-		if (found.length === 0) return { entries: [record({ ...verdict, concerns: [] })] };
-		const recheck = needsRecheck(verdict);
+		if (!judgment.verdict) return { entries: [record({ verdict: "unknown", reason: judgment.reason })] };
+		const { found, notes } = assess(judgment.verdict, snap.reviewClear);
+		const proceed = !continued && continues(judgment.verdict, snap);
+		if (proceed) continued = true;
 		return {
 			entries: [
-				record({ ...verdict, concerns: found }),
-				{ type: "custom_message" as const, customType: ENTRY_TYPE, content: message(verdict, found, recheck), display: true },
+				record({ ...judgment.verdict, concerns: found }),
+				{ type: "custom_message" as const, customType: ENTRY_TYPE, content: message(judgment.verdict, snap, found, notes), display: true },
 			],
-			...(recheck ? { continue: true } : {}),
+			...(proceed ? { continue: true } : {}),
 		};
 	});
 }

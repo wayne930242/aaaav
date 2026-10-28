@@ -1,12 +1,15 @@
 /**
- * pi extension: warns once when write or edit runs before the assistant has
- * stated a `Reality anchor:` line since the user's latest message.
+ * pi extension: inside an open loop, warns once when write or edit runs before the loop has an
+ * anchor (an `anchor` stage in the book, or a `Reality anchor:` line stated since the user's latest
+ * message), and, in a durable loop, once when a production edit runs while the spec is not
+ * approved. Outside a loop, or in a `quick` one, it stays silent.
  */
 
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { currentKind, hasAnchor, openBook, specStatus } from "./support/book.ts";
 
 const ANCHOR = /Reality anchor:/;
 const EXEMPT_IN_PROJECT = ["scratch", "docs/specs"];
@@ -38,6 +41,9 @@ function within(root: string, target: string): boolean {
 }
 
 /** Markdown, text, and HTML files, scratch and spec folders in the project, and temp files outside it; a project that lives in a temp dir is still gated. */
+export const SPEC_WARNING =
+	"anchorloop spec gate: a production edit ran in a durable loop while the recorded spec is not `Status: approved`.";
+
 export function exempt(filePath: string, cwd: string): boolean {
 	if (EXEMPT_EXTENSIONS.includes(extname(filePath).toLowerCase())) return true;
 	const root = real(cwd);
@@ -49,6 +55,7 @@ export function exempt(filePath: string, cwd: string): boolean {
 export default function (pi: ExtensionAPI) {
 	let anchored = false;
 	let warned = false;
+	let specWarned = "";
 
 	pi.on("session_start", (_event, ctx) => {
 		anchored = false;
@@ -75,10 +82,20 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("tool_call", (event, ctx) => {
-		if (anchored || warned || (event.toolName !== "write" && event.toolName !== "edit")) return;
+		if (event.toolName !== "write" && event.toolName !== "edit") return;
 		const filePath = (event.input as { path?: unknown }).path;
-		if (typeof filePath !== "string" || exempt(filePath, ctx.cwd)) return;
-		warned = true;
-		ctx.ui.notify(WARNING, "warning");
+		if (typeof filePath !== "string") return;
+		const book = openBook(ctx);
+		if (!book || exempt(filePath, ctx.cwd)) return;
+		const kind = currentKind(book.entries);
+		if (kind !== "quick" && !anchored && !warned && !hasAnchor(book.entries)) {
+			warned = true;
+			ctx.ui.notify(WARNING, "warning");
+		}
+		const id = String(book.header.id);
+		if (kind === "durable" && specWarned !== id && specStatus(book.entries, ctx.cwd) !== "approved") {
+			specWarned = id;
+			ctx.ui.notify(SPEC_WARNING, "warning");
+		}
 	});
 }
