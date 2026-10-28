@@ -4,7 +4,7 @@
 
 1. Locate the prior trail: the resume note, the decision trail, the branch, and this workspace's pi sessions only (the cwd's folder under the session directory: `~/.pi/agent/sessions/--Users-me-proj--/` for `/Users/me/proj` unless `--session-dir`, `PI_CODING_AGENT_SESSION_DIR`, or `sessionDir` moves it). Parse a long session in a subagent and keep the reduced timeline.
 2. Reconstruct state: branch and worktree, commits landed against the base, open todos, decisions made, and processes still running.
-3. Treat the trail as authoritative: name the resume point and redo nothing it shows finished.
+3. Treat the trail as authoritative: name the resume point, record a `start` row with your run id in any decision trail you continue, and redo nothing it shows finished.
 4. Route the remaining work to its entry playbook, which owns the rest of the run.
 5. Before reporting done, verify the inherited claims against the original goal on the real artifact; a prior self-report is not the proof.
 

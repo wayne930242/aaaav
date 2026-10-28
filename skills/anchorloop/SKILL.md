@@ -23,7 +23,7 @@ Before the first change, state:
 
 The anchorloop extension holds `write` and `edit` outside `scratch/` and `docs/specs/` until this line appears after the user's latest message.
 
-Size the anchor to the change's actual reach and pick one method: an executable check, a user operation, human judgment, or a focused review. An anchor assigned by a coordinator governs. Pick a review anchor when the change touches a shared contract, authorization or permission data, a migration, or security, or when the Jev second thought rates its review `full`; other changes rest on their check and the author's own read of the diff. A review anchor names the realistic use it judges against and blocks on P0 and P1 findings only, recording lower ones as follow-ups; after fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is normally once, after the last increment.
+Size the anchor to the change's actual reach and pick one method: an executable check, a user operation, human judgment, or a focused review. An anchor assigned by a coordinator governs. Pick a review anchor when the change touches a shared contract, authorization or permission data, a migration, or security, or when the Jev second thought rates its review `full`; other changes rest on their check and the author's own read of the diff. A review anchor names the realistic use it judges against and blocks on P0 and P1 findings only, recording lower ones as follow-ups. Answer each finding with a fix, a contest citing evidence the reviewer could read, or an escalation to the user when that evidence lives elsewhere; fill any gap a fresh reader hit. After fixes it re-checks only those findings and the lines the fixes changed, and when two consecutive rounds still raise new blocking findings the run stops and hands the trend to the user, because a fresh exploratory review each round finds new edge cases instead of converging. The checkpoint is normally once, after the last increment.
 
 ## Act
 
@@ -33,7 +33,7 @@ Give follow-up work (a fix round, a retry, the next item) to a fresh subagent ca
 
 Report problems outside the contract as follow-ups rather than fixing them in this change, because each extra fix reopens review on code the round never meant to touch.
 
-[PRINCIPLES.md](PRINCIPLES.md) holds the named principles the playbooks cite. The reply names a principle only when it changed a decision, together with that decision.
+The reply names a [principle](PRINCIPLES.md) only when it changed a decision, together with that decision.
 
 ### Friction Notes
 
@@ -47,15 +47,15 @@ Keep them in `scratch/friction.md` unless the entry names another home.
 
 ### Decision Trail
 
-A run the user reviews after stepping away records one row per fork, completed unit, pivot, or blocker in `scratch/decisions-<task-slug>.tsv` with the `anchorloop_decision` tool. Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. A run that picks up an existing trail reads its last rows, then records a `start` row with its run id. Before handing back, check every row against what the run actually did and build the report from the trail.
+A run the user reviews after stepping away records one row per fork, completed unit, pivot, or blocker in `scratch/decisions-<task-slug>.tsv` with the `anchorloop_decision` tool. Evidence is a pointer (commit, `file:line`, artifact path), never prose, and a wrong call gets a superseding row instead of an edit. Before handing back, check every row against what the run actually did and build the report from the trail.
 
 ## Verify
 
-Exercise the anchor and report what it observed. A requirement the anchor did not exercise is `unknown`; a green unrelated check is not evidence for it. Report local tests, builds, interactive runs, commit, push, CI, and deployment as separate claims; one never stands in for another. A criterion that needs human judgment is a human checkpoint: propose a `human-feedback` pass when it is still `unknown`, and record its verdict apart from executable or review evidence.
+Exercise the anchor and report what it observed. A requirement the anchor did not exercise is `unknown`, whatever unrelated checks show. Report local tests, builds, interactive runs, commit, push, CI, and deployment as separate claims; one never stands in for another. A criterion that needs human judgment is a human checkpoint: propose a `human-feedback` pass when it is still `unknown`, and record its verdict apart from executable or review evidence.
 
 A review anchor stays open until an independent reviewer returns its verdict. When none can run or its result is lost, report `blocked: independent review` and keep merge and release closed, because the author's own review, green tests, and CI each miss what an independent reader catches.
 
-Write the reply the playbook's `Reply:` line names, with the anchor's evidence. After a run that changed something, the extension may add a Jev second thought on that reply; it is advisory: recheck the evidence it questions, then finish or continue on your own judgment. When a calling workflow supplies an artifact, write the results into it instead of a separate report or plan.
+Write the reply the playbook's `Reply:` line names, with the anchor's evidence. A Jev second thought the extension may add after a changing run is advisory: recheck the evidence it questions, then decide. When a calling workflow supplies an artifact, write the results into it instead of a separate report or plan.
 
 ### Reflexive Pass
 
@@ -73,4 +73,4 @@ Lifecycle playbooks wrap the entry playbook that does the work.
 
 ---
 
-Playbooks, principles, and the decision trail are adapted from [pstack](https://github.com/backnotprop/pstack) by Lauren Tan (MIT License), revision `e44668c`.
+Playbooks, principles, and the decision trail are adapted from [pstack](https://github.com/backnotprop/pstack) by Lauren Tan (MIT License), revision `e44668c`. Finding triage is adapted from [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model) (Apache-2.0), revision `a8380ab`, `skills/egm-resolve/SKILL.md`.
