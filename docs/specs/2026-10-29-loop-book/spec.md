@@ -45,6 +45,16 @@ Any stage accepts `skip: <reason>`. Missing stages produce warnings, not refusal
 
 In a subagent (`isSubagent()` in `pi/second-thought.ts`), the book lives under the child's `PI_SUBAGENT_ID` and a declared `verify` is recorded as `check`; only main records `verify` and `review`. Main links a child book when its `subagent` tool result returns the child id, and `read` includes each linked child's summary.
 
+### Todo links
+
+Inside an open loop, each `todo` create or update is recorded as a task entry carrying its id, subject, status, and these `metadata` keys when present:
+
+- `anchor`: the task's own check (command or review); a task without one inherits the loop anchor.
+- `ref`: one or more `<path>#<heading>` pointers into a spec, design, or other doc. The book resolves each heading to its current line range when recording (`spec.md#Second thought → L88-L101`) and re-resolves at `read`; a heading that no longer exists shows `missing`.
+- `followup`: as in Loop lifecycle.
+
+`read` lists each task as `#id status subject — anchor — refs (line ranges)` and, when a bash call matched a task's own `anchor`, its last exit code. A task in an `inline`, `reviewed`, or `durable` loop without `anchor` or `ref` is recorded as is; no warning. The skill text names the keys in one line where `todo` is introduced.
+
 ### Durable artifacts recorded automatically
 
 A successful `write` or `edit` to `docs/specs/*/{decision,spec,design,verification}.md` inside an open loop appends an entry with a brief content summary, without any agent call:
