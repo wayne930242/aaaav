@@ -7,7 +7,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmdirSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -120,8 +120,19 @@ export function openLoop(who: Who, env: NodeJS.ProcessEnv = process.env): Book |
 	return book && !isClosed(book) ? book : undefined;
 }
 
+function openForAppend(path: string): number {
+	try {
+		return openSync(path, "a");
+	} catch (error) {
+		// Another session's sweep may remove the directory between mkdir and open; recreate it once.
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		mkdirSync(dirname(path), { recursive: true });
+		return openSync(path, "a");
+	}
+}
+
 function appendBytes(path: string, text: string): void {
-	const fd = openSync(path, "a");
+	const fd = openForAppend(path);
 	try {
 		const bytes = Buffer.from(text);
 		const written = writeSync(fd, bytes);
@@ -133,8 +144,8 @@ function appendBytes(path: string, text: string): void {
 
 export function createBook(who: Who, env: NodeJS.ProcessEnv = process.env): Book {
 	const path = bookPath(who, env);
-	mkdirSync(dirname(path), { recursive: true });
 	if (existsSync(path)) deleteBook(path);
+	mkdirSync(dirname(path), { recursive: true });
 	const child = childId(env);
 	const header = {
 		// Unique per loop: the file name follows the session, so a reopened loop must not reuse an old id.
@@ -166,12 +177,29 @@ export function findChildBook(id: string, env: NodeJS.ProcessEnv = process.env):
 	return undefined;
 }
 
+function removeIfEmpty(dir: string): boolean {
+	try {
+		rmdirSync(dir);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Removes the `agents/` and project directories a deleted book leaves empty. */
+function tidy(dir: string): void {
+	if (!removeIfEmpty(dir)) return;
+	const parent = dirname(dir);
+	if (basename(dir) === "agents") removeIfEmpty(parent);
+}
+
 export function deleteBook(path: string): void {
 	try {
 		unlinkSync(path);
 	} catch {
 		// Already gone.
 	}
+	tidy(dirname(path));
 }
 
 export type Sweep = { deleted: string[]; open: string[] };
@@ -194,33 +222,47 @@ export function sweep(env: NodeJS.ProcessEnv = process.env, cwd?: string): Sweep
 	const slug = cwd ? projectSlug(cwd) : undefined;
 	const linked = new Set<string>();
 	const children: Book[] = [];
+	// Other sessions create and tidy books concurrently, so a directory or file can vanish mid-walk; skip it.
 	for (const project of readdirSync(root)) {
-		const dir = join(root, project);
-		if (!statSync(dir).isDirectory()) continue;
-		for (const file of readdirSync(dir)) {
-			if (!file.endsWith(".yml")) continue;
-			const book = parseBook(join(dir, file));
-			if (!book) continue;
-			if (sessionGone(book)) {
-				deleteBook(book.path);
-				result.deleted.push(book.path);
-				continue;
+		try {
+			const dir = join(root, project);
+			if (!statSync(dir).isDirectory()) continue;
+			for (const file of readdirSync(dir)) {
+				if (!file.endsWith(".yml")) continue;
+				const book = parseBook(join(dir, file));
+				if (!book) continue;
+				if (sessionGone(book)) {
+					deleteBook(book.path);
+					result.deleted.push(book.path);
+					continue;
+				}
+				if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
+				for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
 			}
-			if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
-			for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
-		}
-		const agents = join(dir, "agents");
-		if (existsSync(agents)) {
-			for (const file of readdirSync(agents)) {
-				const child = file.endsWith(".yml") ? parseBook(join(agents, file)) : undefined;
-				if (child) children.push(child);
+			const agents = join(dir, "agents");
+			if (existsSync(agents)) {
+				for (const file of readdirSync(agents)) {
+					const child = file.endsWith(".yml") ? parseBook(join(agents, file)) : undefined;
+					if (child) children.push(child);
+				}
 			}
+		} catch {
+			// Vanished under a concurrent tidy.
 		}
 	}
 	for (const child of children) {
-		if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
-		deleteBook(child.path);
-		result.deleted.push(child.path);
+		try {
+			if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
+			deleteBook(child.path);
+			result.deleted.push(child.path);
+		} catch {
+			// Vanished under a concurrent tidy.
+		}
+	}
+	for (const project of readdirSync(root)) {
+		const dir = join(root, project);
+		removeIfEmpty(join(dir, "agents"));
+		removeIfEmpty(dir);
 	}
 	return result;
 }
@@ -255,6 +297,26 @@ export function lastIndex(entries: Entry[], ...stages: string[]): number {
 	return -1;
 }
 
+/**
+ * The book's entries with the change entries of its linked children merged in by time, each marked `child`, so a coordinator
+ * whose edits are all made by children still shows an act. Indexes into the result differ from indexes into `entries`.
+ */
+export function withChildActs(entries: Entry[], env: NodeJS.ProcessEnv = process.env): Entry[] {
+	const acts: Entry[] = [];
+	for (const id of childIds(entries)) {
+		const child = findChildBook(id, env);
+		if (child) acts.push(...child.entries.filter((entry) => entry.stage === "edit").map((entry) => ({ ...entry, child: id })));
+	}
+	if (acts.length === 0) return entries;
+	acts.sort((a, b) => a.ts.localeCompare(b.ts));
+	const merged: Entry[] = [];
+	for (const entry of entries) {
+		while (acts.length && acts[0].ts < entry.ts) merged.push(acts.shift() as Entry);
+		merged.push(entry);
+	}
+	return [...merged, ...acts];
+}
+
 /** The index of the latest change entry (a production write or edit, a commit), or -1. */
 export function lastActIndex(entries: Entry[]): number {
 	return lastIndex(entries, "edit");
@@ -281,7 +343,8 @@ export function reviewTrend(entries: Entry[]): string {
 }
 
 /** A review recorded after the last change with no blocking finding on it. */
-export function reviewClearAfterLastAct(entries: Entry[]): boolean {
+export function reviewClearAfterLastAct(raw: Entry[]): boolean {
+	const entries = withChildActs(raw);
 	const review = lastIndex(entries, "review");
 	return review >= 0 && review > lastActIndex(entries) && entries[review].blocking === false;
 }
@@ -302,7 +365,8 @@ function evidenceLine(entry: Entry): string {
 }
 
 /** The latest check or verify entry after the last change, or undefined when none follows it. */
-export function verifyAfterLastAct(entries: Entry[]): Entry | undefined {
+export function verifyAfterLastAct(raw: Entry[]): Entry | undefined {
+	const entries = withChildActs(raw);
 	const index = lastIndex(entries, "check", "verify");
 	return index >= 0 && index > lastActIndex(entries) ? entries[index] : undefined;
 }
@@ -369,18 +433,23 @@ export function allFriction(entries: Entry[], env: NodeJS.ProcessEnv = process.e
 
 export type RetryPair = { key: string; fail: number; pass: number };
 
-/** Runs that failed and later passed, per anchor and per task anchor, found from the recorded exit codes. */
+/** Regressions: a run that failed after the same command had passed in this loop, and then passed again. A failure before any pass is red-first work, not a retry. */
 export function retryPairs(entries: Entry[]): RetryPair[] {
 	const pairs: RetryPair[] = [];
+	const passed = new Set<string>();
 	const failed = new Map<string, number>();
 	entries.forEach((entry, index) => {
-		const key = entry.stage === "taskrun" ? `task#${entry.id}` : entry.stage === "verify" || entry.stage === "check" ? "anchor" : undefined;
+		if (entry.declared === true) return;
+		const key = entry.stage === "taskrun" ? `task#${entry.id}` : entry.stage === "verify" || entry.stage === "check" ? `anchor:${String(entry.command ?? "")}` : undefined;
 		if (!key || typeof entry.exit !== "number") return;
 		if (entry.exit !== 0) {
-			if (!failed.has(key)) failed.set(key, index);
-		} else if (failed.has(key)) {
-			pairs.push({ key, fail: failed.get(key) as number, pass: index });
-			failed.delete(key);
+			if (passed.has(key) && !failed.has(key)) failed.set(key, index);
+		} else {
+			if (failed.has(key)) {
+				pairs.push({ key, fail: failed.get(key) as number, pass: index });
+				failed.delete(key);
+			}
+			passed.add(key);
 		}
 	});
 	return pairs;
@@ -456,6 +525,12 @@ export function repoOf(path: string): { repo: string; head: string } | undefined
 	return repo && head ? { repo: real(repo), head } : undefined;
 }
 
+/** The root of the git repo containing `path`, or undefined outside a repo. */
+export function repoRootOf(path: string): string | undefined {
+	const repo = git(existingDir(dirname(resolve(path))), ["rev-parse", "--show-toplevel"]);
+	return repo ? real(repo) : undefined;
+}
+
 export function bases(entries: Entry[]): { repo: string; head: string }[] {
 	return entries.filter((entry) => entry.stage === "base").map((entry) => ({ repo: String(entry.repo), head: String(entry.head) }));
 }
@@ -485,11 +560,11 @@ export function diffAgainstBases(entries: Entry[]): Diff {
 			lines.push(`${basename(repo)}: diff unavailable`);
 			continue;
 		}
-		lines.push(`${basename(repo)}: ${stat || "no tracked changes"}${untracked.length ? `; ${untracked.length} untracked` : ""}`);
+		if (stat) lines.push(`${basename(repo)}: ${stat}`);
 		files.push(...names.map((name) => `${basename(repo)}/${name}`), ...untracked.map((name) => `${basename(repo)}/${name}`));
 		paths.push(...[...names, ...untracked].map((name) => join(repo, name)));
 	}
-	return { summary: lines.join("\n") || "no repository", files, paths };
+	return { summary: lines.join("\n") || (bases(entries).length ? "no tracked changes" : "no repository"), files, paths };
 }
 
 export function diffText(diff: Diff, limit = 1200): string {
@@ -633,19 +708,33 @@ export function artifactOnDisk(folder: string, name: string, cwd: string): Entry
 
 // --- todo links ----------------------------------------------------------------------------------
 
-/** The `ref` metadata of a task as a list of `<path>#<heading>` pointers. */
+const MARKDOWN = /\.(md|markdown)$/i;
+
+const isMarkdownRef = (ref: string): boolean => MARKDOWN.test(ref.split("#")[0]);
+
+/** The `ref` metadata of a task as pointers: `<path>#<heading>` into markdown, or the path of any other file. */
 export function refsOf(metadata: Record<string, unknown> | undefined): string[] {
 	const ref = metadata?.ref;
 	const list = Array.isArray(ref) ? ref : [ref];
-	return list.filter((item): item is string => typeof item === "string" && item.includes("#"));
+	return list.filter((item): item is string => typeof item === "string" && item.trim() !== "" && (item.includes("#") || !isMarkdownRef(item)));
 }
 
-/** The line range of the section `<path>#<heading>` names, such as `L88-L101`, or `missing` when the file or heading is gone. */
+/**
+ * The line range of the section `<path>#<heading>` names, such as `L88-L101`, or `missing` when the file or heading is gone.
+ * A ref to a file that is not markdown has no headings to resolve and returns "" (shown as given). Relative paths resolve against
+ * the cwd, the loop's repos, and the folders of recorded artifacts.
+ */
 export function resolveRef(ref: string, cwd: string, entries: Entry[]): string {
+	if (!isMarkdownRef(ref)) return "";
 	const split = ref.indexOf("#");
+	if (split < 0) return "";
 	const path = ref.slice(0, split);
 	const heading = ref.slice(split + 1).trim();
-	const dirs = [cwd, ...new Set(entries.filter((entry) => typeof entry.path === "string").map((entry) => dirname(resolve(cwd, entry.path as string))))];
+	const dirs = [
+		cwd,
+		...bases(entries).map((base) => base.repo),
+		...new Set(entries.filter((entry) => typeof entry.path === "string").map((entry) => dirname(resolve(cwd, entry.path as string)))),
+	];
 	for (const dir of dirs) {
 		let lines: string[];
 		try {
@@ -692,7 +781,11 @@ export function taskLines(entries: Entry[], todos: Task[], cwd: string): string[
 			const task = live.get(entry.id as number);
 			const run = exits.get(entry.id as number);
 			const anchor = typeof entry.anchor === "string" ? `${entry.anchor}${run ? ` (exit ${run.exit})` : ""}` : "loop anchor";
-			const refs = ((entry.refs ?? []) as { ref: string }[]).map((item) => `${item.ref} → ${resolveRef(item.ref, cwd, entries)}`);
-			return [`#${entry.id} ${task?.status} ${task?.subject}`, anchor, ...(refs.length ? [refs.join(", ")] : [])].join(" — ");
+			const refs = ((entry.refs ?? []) as { ref: string }[]).map((item) => {
+				const range = resolveRef(item.ref, cwd, entries);
+				return range ? `${item.ref} → ${range}` : item.ref;
+			});
+			const followup = task?.metadata?.followup ?? entry.followup;
+			return [`#${entry.id} ${task?.status} ${task?.subject}`, anchor, ...(refs.length ? [refs.join(", ")] : []), ...(followup !== undefined ? [`followup: ${String(followup)}`] : [])].join(" — ");
 		});
 }

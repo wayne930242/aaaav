@@ -223,7 +223,7 @@ class TestSecondThought(ExtensionCase):
         self.assertEqual(state["phase"], "current: verify; next: review; missing: a review round after the last change with Blocking: P0=0 P1=0")
         self.assertIn("last check: exit 0 — 3 passed", state["verify"])
         self.assertEqual(state["todos"], "1 open of 2")
-        self.assertEqual(state["friction"], "1: a → b [unreflected]")
+        self.assertEqual(state["friction"], "1 recorded, 0 reflected\n1: a → b [unreflected]")
         legend, task = state["tasks"].splitlines()[:2]
         self.assertEqual(legend, "legend: #id status subject — anchor (last exit) — ref → line range; missing = heading gone")
         self.assertEqual(task, "#1 in_progress build it — pytest -q (exit 0) — docs/x.md#Gone → missing")
@@ -330,7 +330,7 @@ class TestSecondThought(ExtensionCase):
         self.assertIn("needs full independent review", self.content(out))
 
     def test_a_retry_pair_without_friction_adds_the_friction_hint(self):
-        out = self.settle_after(answers(), edit_result(), bash_result("pytest -q", 1, "bad"), bash_result("pytest -q", 0, "ok"))
+        out = self.settle_after(answers(), edit_result(), bash_result("pytest -q", 0, "ok"), bash_result("pytest -q", 1, "bad"), bash_result("pytest -q", 0, "ok"))
         self.assertIn("friction: a failed run was retried and passed, with no friction entry after it", self.content(out))
 
     def test_low_completion_done_and_quality_are_listed_as_concerns(self):
