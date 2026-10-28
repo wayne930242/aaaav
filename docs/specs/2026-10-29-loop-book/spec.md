@@ -108,3 +108,14 @@ Blocking any tool besides `close`; recording stages without a declared loop; cha
 ## Reality anchor
 
 `uv run --with pytest pytest -q` with new tests covering: todo-opens-loop and extend; kind upgrade; close refusal listing undisposed todos and success deleting books plus the session entry; evidence attachment from bash exit codes; `Blocking:` parsing; durable artifact summaries across repeated edits; subagent verify recorded as check and child linking; second-thought state built from the book, silence without a loop, recheck suppression; stale-book sweep; YAML validity under parallel appends. Plus `uv run python hooks/validate_all.py .`. Then one fresh-context reviewer, because the second thought's judging interface changes.
+
+## Amendment: phase machine (user approved 2026-10-29, all recommended choices)
+
+The design in `phases.md` (this folder) is binding, summarized here:
+
+- Every loop kind runs a fixed phase sequence: `quick` act → check → close; `inline` anchor → act → verify → close; `reviewed` adds review before close; `durable` decide → grill → spec → read → approve → design → anchor → act → verify → review → close.
+- Each phase has an entry condition (the previous phase complete or skipped) and a completion condition read from book evidence: decide = `decision.md` has rows; grill = 0 open rows (auto-skipped when there were none); spec = `Status: proposed`; read = a dispatched subagent whose brief contains the spec path returned after proposed (fallback: `anchorloop_stage read`); approve = `Status: approved` with `Approved from`; design = `design.md` approach section non-empty; anchor = `Reality anchor:` line or anchor stage; act = production diff; verify/check = anchor command exit 0 after the last act; review = a round after the last act with `Blocking: P0=0 P1=0`; close = todo followups (the only refusal).
+- Acting in a phase whose predecessor is incomplete warns once per jump, naming what is missing and the `anchorloop_stage skip <phase> <reason>` escape. Skips are recorded and shown in the close summary.
+- Phases regress when evidence changes (spec back to proposed, a diff after verify), and the next jump warns again.
+- The anchor gate, the durable approval warning, and the two-rounds-blocking warning become phase-machine checks, not separate mechanisms.
+- The program computes the next phase; `read` shows `<kind> · phase <current> ✓ → <next> (missing: …) · skipped: …`. Jev's state gains `phase` (current, next, missing) and Jev judges only whether the completion condition truly holds and whether to advance, go back, or ask the user.
