@@ -118,10 +118,18 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 
 /** The command with quoted strings blanked out, keeping every index, so quoted text never counts as a run or a separator. */
 function unquoted(command: string): string {
-	return command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, (quoted) => " ".repeat(quoted.length));
+	const masked = command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, (quoted) => " ".repeat(quoted.length));
+	// A `#` that starts a word comments out the rest of the line.
+	return masked.replace(/(^|\s)#[^\n]*/g, (comment, lead: string) => lead + " ".repeat(comment.length - lead.length));
 }
 
-const SETUP_SEGMENT = /^\s*(\.|source\b|cd\b|export\b|set\b|\w+=)/;
+/** Text before a run with `VAR=value` and simple wrappers (`uv run`, `time`, `timeout N`, `env`) peeled off its end. */
+function beforeRun(text: string): string {
+	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+\S+\s+|\benv\s+)+$/, "");
+}
+
+// `cd` and `export` change what a check tests, so they are not setup.
+const SETUP_SEGMENT = /^\s*(\.|source\b|set\b|\w+=)/;
 
 /**
  * Where `command` runs `anchor` as a command (at the start, or after `&&`, `||`, `;`, `|`, `!`, `(` or a newline, outside quotes,
@@ -137,9 +145,10 @@ export function anchorRun(command: string, anchorText: string): { at: number; an
 		if (!anchor) continue;
 		let found: number | undefined;
 		for (let at = masked.indexOf(anchor); at >= 0; at = masked.indexOf(anchor, at + 1)) {
-			const before = masked.slice(0, at).replace(/(\b\w+=\S*\s+)+$/, "");
+			const before = beforeRun(masked.slice(0, at));
 			const after = masked.charAt(at + anchor.length);
-			if (/(^|&&|\|\||[;|!(\n])\s*$/.test(before) && (after === "" || /[\s;&|)]/.test(after))) found = at;
+			// `$(`, `<(`, `>(` substitute output; their exit is not the call's.
+			if (/(^|&&|\|\||[;|!\n]|(^|[^$<>])\()\s*$/.test(before) && (after === "" || /[\s;&|)]/.test(after))) found = at;
 		}
 		if (found !== undefined) return { at: found, anchor };
 	}
@@ -158,10 +167,13 @@ export function anchorExit(command: string, anchorText: string, exit: number | n
 	const masked = unquoted(command);
 	const { at, anchor } = run;
 	// `! anchor` inverts the code and `x || anchor` may never run it.
-	if (/(!|\|\|)\s*$/.test(masked.slice(0, at).replace(/(\b\w+=\S*\s+)+$/, ""))) return "unknown";
+	if (/(!|\|\|)\s*(\(\s*|cd\s+\S+\s*&&\s*)*$/.test(beforeRun(masked.slice(0, at)))) return "unknown";
+	// Inside a subshell, a pipefail set or the exit of what follows is not this shell's.
+	const depth = [...masked.slice(0, at)].reduce((open, char) => open + (char === "(" ? 1 : char === ")" ? -1 : 0), 0);
 	const rest = masked.slice(at + anchor.length);
 	// The last `set -o pipefail` or `set +o pipefail` before the anchor decides.
-	const toggles = [...masked.slice(0, at).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
+	const toggles = [...masked.slice(0, at).replace(/\([^()]*\)/g, (sub) => " ".repeat(sub.length)).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
+	if (depth > 0 && toggles.length === 0 && /\|(?!\|)/.test(rest)) return "unknown";
 	const pipefail = toggles.at(-1)?.[1] === "-";
 	let chained = false;
 	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe

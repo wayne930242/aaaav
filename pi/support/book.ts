@@ -553,9 +553,11 @@ export function touchRepoBeforeMerge(book: Book, dir: string, verb: string): boo
 	const found = repoOf(join(dir, "_"));
 	if (!found || bases(book.entries).some((base) => base.repo === found.repo)) return false;
 	const reflog = git(found.repo, ["reflog", "-n", "50", "--format=%H %gs"])?.split("\n").filter(Boolean) ?? [];
-	const before = reflog.find((line, index) => index > 0 && !reflog.slice(0, index).some((top) => !top.slice(41).startsWith(verb)))?.slice(0, 40);
-	const ancestor = before !== undefined && git(found.repo, ["merge-base", "--is-ancestor", before, "HEAD"]) !== undefined;
-	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: ancestor ? before : found.head }));
+	const first = reflog.findIndex((line) => !line.slice(41).startsWith(verb));
+	const before = reflog.length > 0 && reflog[0].slice(41).startsWith(verb) && first > 0 ? reflog[first].slice(0, 40) : undefined;
+	// A rebasing pull leaves the old HEAD off HEAD's history; their merge base keeps the pulled commits in the diff.
+	const base = before === undefined ? undefined : git(found.repo, ["merge-base", before, "HEAD"]);
+	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: base || found.head }));
 	return true;
 }
 

@@ -89,6 +89,43 @@ class TestReview4(BookCase):
         self.assertEqual(self.exits("set -o pipefail; set +o pipefail; pytest -q | tail -3", 0)[-1], "unknown")
         self.assertEqual(self.exits("cd x && set -o pipefail; pytest -q 2>&1 | tail -3", 1)[-1], 1)
 
+    def test_a_cd_or_export_prefix_is_part_of_the_check(self):
+        self.assertEqual(self.exits("cd other && npm test", 0, anchor="cd app && npm test"), [])
+        self.assertEqual(self.exits(". .venv/bin/activate && pytest -q", 1, anchor=". .venv/bin/activate && pytest -q"), [1])
+
+    def test_substitutions_guarded_subshells_and_comments_are_not_runs_with_a_trustworthy_exit(self):
+        for command in ("echo $(pytest -q)", "diff <(pytest -q) exp", "true || (pytest -q)", "[ -d .venv ] || (cd x && pytest -q)", "! (pytest -q)", "(set -o pipefail); pytest -q | tail", "echo hi #; pytest -q"):
+            with self.subTest(command=command):
+                self.assertIn(self.exits(command, 0)[-1:], ([], ["unknown"]))
+
+    def test_common_wrappers_still_count_as_a_run(self):
+        for command in ("uv run pytest -q", "time pytest -q", "timeout 600 pytest -q", "env A=1 pytest -q", "(cd x && pytest -q)"):
+            with self.subTest(command=command):
+                self.assertEqual(self.exits(command, 1)[-1], 1)
+
+    def test_a_multi_commit_cherry_pick_bases_on_the_head_before_the_first_pick(self):
+        repo = self.cwd.parent / "multi"
+        repo.mkdir()
+        run = lambda *args: subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+        run("init", "-q")
+        run("config", "user.email", "t@example.com")
+        run("config", "user.name", "t")
+        (repo / "a.py").write_text("a")
+        run("add", "a.py")
+        run("commit", "-qm", "a")
+        run("checkout", "-qb", "side")
+        picks = []
+        for name in ("c", "d", "e"):
+            (repo / f"{name}.py").write_text(name)
+            run("add", f"{name}.py")
+            run("commit", "-qm", name)
+            picks.append(run("rev-parse", "HEAD"))
+        run("checkout", "-q", "-")
+        before = run("rev-parse", "HEAD")
+        run("cherry-pick", *picks)
+        self.replay([*self.open_loop(anchor="pytest"), bash_result(f"cd {repo} && git cherry-pick {' '.join(picks)}", 0, "ok")])
+        self.assertEqual([e["head"] for e in self.entries("base") if e["repo"] == str(repo.resolve())], [before])
+
     def test_a_cherry_pick_first_seen_through_bash_bases_on_the_head_before_it_not_a_stale_orig_head(self):
         repo = self.cwd.parent / "other"
         repo.mkdir()
