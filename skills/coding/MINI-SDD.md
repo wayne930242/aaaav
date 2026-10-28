@@ -2,11 +2,11 @@
 
 The Durable threshold lives in [SKILL.md](SKILL.md).
 
-Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its phase is reached, not up front. Link to project instructions, ADRs, code, research, tickets, and visuals rather than copying them.
+Artifacts live in `docs/specs/YYYY-MM-DD-<slug>/`. Create each file when its phase is reached, not up front. Link to instructions, ADRs, code, and tickets rather than copying them.
 
 ## Decision → `decision.md`
 
-Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grilling` with `decision.md` only when it has an `open` row.
+Resolve facts from their source; use `investigating` or `inspecting` when search is wide. Invoke `grilling` with `decision.md` only when it has an `open` row. Before implementation, note core-rule readiness in `decision.md`.
 
 The file holds outcome and actors; in and out of scope; concrete scenarios; confirmed decisions; open consequential decisions. Explore every consequential branch in:
 
@@ -22,7 +22,7 @@ The file holds outcome and actors; in and out of scope; concrete scenarios; conf
 
 ## Spec → `spec.md`
 
-Persist the spec in `spec.md` under `Status: proposed`, then have a fresh-context subagent that never saw the conversation read it and its links, restate the contract, and list each point it would have to guess to build it. Fold each guess into the spec or take it to the user as an open question, because the author cannot see assumptions it never wrote. Then present it for explicit user confirmation. `proposed` keeps production source untouched while artifacts and read-only work stay open. Only the user's approving reply sets `Status: approved`, `Approved at`, and `Approved from`.
+Persist the spec in `spec.md` under `Status: proposed`, then have a fresh-context subagent read it and its links, restate the contract, and list each point it would have to guess to build it. Fold each guess into the spec or add it to `decision.md` as an `open` row, because the author cannot see assumptions it never wrote; rerun the reader once when a fold changes observable behavior. Then present it for explicit user confirmation. `proposed` keeps production source untouched while artifacts and read-only work stay open. Only the user's approving reply sets `Status: approved`, `Approved at`, and `Approved from`.
 
 The file opens with the approval header, then observable behavior and edge cases; compatibility constraints and non-goals; applied standards with their impact; evidence and precedent links; the selected reality anchor and checkpoint.
 
@@ -51,7 +51,7 @@ Review the diff against project standards, the approved spec, and the confirmed 
 ```
 
 - **pass**: The anchor ran against the actual implementation and observed the expected behavior.
-- **fail**: The anchor executed and observed a deviation from the spec or an error.
+- **fail**: The anchor observed a deviation from the spec or an error.
 - **unknown**: No anchor exercised the requirement in this run.
 
 Then human appropriateness verdicts; deviations from the approved spec or design; unresolved verification gaps and their impact. When friction notes exist, include a Reflexive section listing each with its classification (`misdirection` or `gap`) and its action.
