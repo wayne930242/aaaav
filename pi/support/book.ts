@@ -545,12 +545,17 @@ export function touchRepo(book: Book, path: string): boolean {
 	return true;
 }
 
-/** Adds the repo at `dir` with its pre-command HEAD (`ORIG_HEAD`) after a merge, pull, or cherry-pick first seen through bash. */
-export function touchRepoBeforeMerge(book: Book, dir: string): boolean {
+/**
+ * Adds the repo at `dir` with its pre-command HEAD after a `verb` (merge, pull, or cherry-pick) first seen through bash: the
+ * reflog entry before the run of `verb` entries on top. ORIG_HEAD is not used, since cherry-pick leaves an old one in place.
+ */
+export function touchRepoBeforeMerge(book: Book, dir: string, verb: string): boolean {
 	const found = repoOf(join(dir, "_"));
 	if (!found || bases(book.entries).some((base) => base.repo === found.repo)) return false;
-	const origin = git(found.repo, ["rev-parse", "ORIG_HEAD"]);
-	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: origin || found.head }));
+	const reflog = git(found.repo, ["reflog", "-n", "50", "--format=%H %gs"])?.split("\n").filter(Boolean) ?? [];
+	const before = reflog.find((line, index) => index > 0 && !reflog.slice(0, index).some((top) => !top.slice(41).startsWith(verb)))?.slice(0, 40);
+	const ancestor = before !== undefined && git(found.repo, ["merge-base", "--is-ancestor", before, "HEAD"]) !== undefined;
+	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: ancestor ? before : found.head }));
 	return true;
 }
 

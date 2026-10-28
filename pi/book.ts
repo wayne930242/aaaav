@@ -8,6 +8,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
@@ -115,24 +116,53 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
-/** An anchor with an environment prefix (`. venv/bin/activate && pytest -q`) matches on its last `&&` segment. */
-export function anchorSegment(anchor: string): string {
-	return anchor.split("&&").at(-1)?.trim() || anchor;
+/** The command with quoted strings blanked out, keeping every index, so quoted text never counts as a run or a separator. */
+function unquoted(command: string): string {
+	return command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, (quoted) => " ".repeat(quoted.length));
+}
+
+const SETUP_SEGMENT = /^\s*(\.|source\b|cd\b|export\b|set\b|\w+=)/;
+
+/**
+ * Where `command` runs `anchor` as a command (at the start, or after `&&`, `||`, `;`, `|`, `!`, `(` or a newline, outside quotes,
+ * past any `VAR=value` prefixes), as the last such run, or undefined. The full anchor is tried first; an anchor whose earlier
+ * `&&` segments only set up the environment (`. venv/bin/activate && pytest -q`) also matches on its last segment.
+ */
+export function anchorRun(command: string, anchorText: string): { at: number; anchor: string } | undefined {
+	const masked = unquoted(command);
+	const segments = anchorText.split("&&").map((segment) => segment.trim());
+	const candidates = [anchorText.trim()];
+	if (segments.length > 1 && segments.slice(0, -1).every((segment) => SETUP_SEGMENT.test(segment))) candidates.push(segments.at(-1)!);
+	for (const anchor of candidates) {
+		if (!anchor) continue;
+		let found: number | undefined;
+		for (let at = masked.indexOf(anchor); at >= 0; at = masked.indexOf(anchor, at + 1)) {
+			const before = masked.slice(0, at).replace(/(\b\w+=\S*\s+)+$/, "");
+			const after = masked.charAt(at + anchor.length);
+			if (/(^|&&|\|\||[;|!(\n])\s*$/.test(before) && (after === "" || /[\s;&|)]/.test(after))) found = at;
+		}
+		if (found !== undefined) return { at: found, anchor };
+	}
+	return undefined;
 }
 
 /**
  * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when something after the anchor
- * can replace it: `||`, `;`, a newline, or a pipe straight after the anchor unless the command starts with `set -o pipefail`.
+ * can replace it: `||`, `;`, a newline, `&`, or a pipe straight after the anchor unless `set -o pipefail` is in effect before it.
  * A chain `anchor && other` keeps a failed anchor's code, so it stands.
  */
 export function anchorExit(command: string, anchorText: string, exit: number | null): number | "unknown" {
 	if (exit === null) return "unknown";
-	const anchor = anchorSegment(anchorText);
-	const at = command.lastIndexOf(anchor);
+	const run = anchorRun(command, anchorText);
+	if (!run) return "unknown";
+	const masked = unquoted(command);
+	const { at, anchor } = run;
 	// `! anchor` inverts the code and `x || anchor` may never run it.
-	if (at < 0 || /(!|\|\|)\s*$/.test(command.slice(0, at))) return "unknown";
-	const rest = command.slice(at + anchor.length);
-	const pipefail = /\bset\s+(-\w+\s+|-o\s+\w+\s+)*-o\s+pipefail\b|\bset\s+-\w*e\w*o\s+pipefail\b|\bset\s+-\w*o\s+pipefail\b/.test(command.slice(0, at));
+	if (/(!|\|\|)\s*$/.test(masked.slice(0, at).replace(/(\b\w+=\S*\s+)+$/, ""))) return "unknown";
+	const rest = masked.slice(at + anchor.length);
+	// The last `set -o pipefail` or `set +o pipefail` before the anchor decides.
+	const toggles = [...masked.slice(0, at).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
+	const pipefail = toggles.at(-1)?.[1] === "-";
 	let chained = false;
 	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe
 	// straight after the anchor unless pipefail is set.
@@ -423,16 +453,20 @@ export default function (pi: ExtensionAPI) {
 		const exit = bashExit(event);
 		const last = lastLine(output);
 		const anchor = anchorCommand(book.entries);
-		if (anchor && command.includes(anchorSegment(anchor))) {
+		if (anchor && anchorRun(command, anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
 			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
-			if (typeof task.anchor === "string" && command.includes(anchorSegment(task.anchor))) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
+			if (typeof task.anchor === "string" && anchorRun(command, task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
 		}
-		if (exit === 0 && /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.test(command) && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
-			const named = /\bgit\s+-C\s+(\S+)/.exec(command)?.[1] ?? /\bcd\s+(\S+)/.exec(command)?.[1];
-			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), named ?? "."));
+		const merged = /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.exec(command);
+		if (exit === 0 && merged && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
+			// The repo is the `-C` of the merge itself, else the nearest `cd` before it.
+			const cds = [...command.slice(0, merged.index).matchAll(/\bcd\s+(\S+)/g)];
+			const named = merged[1]?.trim().replace(/^-C\s+/, "") ?? cds.at(-1)?.[1];
+			const dir = named?.replace(/^~(?=\/|$)/, homedir());
+			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), dir ?? "."), merged[2]);
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {

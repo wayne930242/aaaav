@@ -67,6 +67,52 @@ class TestActEvidence(BookCase):
         self.assertEqual(len(self.entries("edit")), 2)
 
 
+class TestReview4(BookCase):
+    def exits(self, command: str, code: int, anchor: str = "pytest -q") -> list:
+        self.replay([*self.open_loop(anchor=anchor), bash_result(command, code, "out")])
+        return [e["exit"] for e in self.entries("verify")]
+
+    def test_the_anchor_named_again_in_text_after_its_run_does_not_hide_the_separator(self):
+        self.assertEqual(self.exits('pytest -q || echo "pytest -q failed"', 0)[-1], "unknown")
+        self.assertEqual(self.exits("pytest -q; echo done pytest -q", 0)[-1], "unknown")
+
+    def test_a_longer_word_is_not_a_run_of_a_short_anchor(self):
+        self.assertEqual(self.exits("cmake ..", 0, anchor="make"), [])
+        self.assertEqual(self.exits("make test; cmake ..", 0, anchor="make test")[-1], "unknown")
+
+    def test_only_the_tail_of_a_two_check_anchor_is_not_a_run_of_the_anchor(self):
+        self.assertEqual(self.exits("node --test", 0, anchor="pytest -q && node --test"), [])
+        self.assertEqual(self.exits("pytest -q && node --test", 0, anchor="pytest -q && node --test"), [0])
+
+    def test_pipefail_in_quotes_or_turned_off_again_does_not_count(self):
+        self.assertEqual(self.exits('echo "set -o pipefail"; pytest -q | tail -3', 0)[-1], "unknown")
+        self.assertEqual(self.exits("set -o pipefail; set +o pipefail; pytest -q | tail -3", 0)[-1], "unknown")
+        self.assertEqual(self.exits("cd x && set -o pipefail; pytest -q 2>&1 | tail -3", 1)[-1], 1)
+
+    def test_a_cherry_pick_first_seen_through_bash_bases_on_the_head_before_it_not_a_stale_orig_head(self):
+        repo = self.cwd.parent / "other"
+        repo.mkdir()
+        run = lambda *args: subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+        run("init", "-q")
+        run("config", "user.email", "t@example.com")
+        run("config", "user.name", "t")
+        for name in ("a", "b", "c"):
+            (repo / f"{name}.py").write_text(name)
+            run("add", f"{name}.py")
+            run("commit", "-qm", name)
+        run("update-ref", "ORIG_HEAD", "HEAD~2")
+        run("checkout", "-qb", "side")
+        (repo / "d.py").write_text("d")
+        run("add", "d.py")
+        run("commit", "-qm", "d")
+        pick = run("rev-parse", "HEAD")
+        run("checkout", "-q", "-")
+        before = run("rev-parse", "HEAD")
+        run("cherry-pick", pick)
+        self.replay([*self.open_loop(anchor="pytest"), bash_result(f"git -C {repo} cherry-pick {pick}", 0, "1 file changed")])
+        self.assertEqual([e["head"] for e in self.entries("base") if e["repo"] == str(repo.resolve())], [before])
+
+
 class TestChildAct(BookCase):
     ENV = {"PI_SUBAGENT_ID": "kid", "PI_SUBAGENT_NAME": "worker-1"}
 
