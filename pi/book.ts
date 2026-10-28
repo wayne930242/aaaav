@@ -114,17 +114,26 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
-const PIPE = /(^|[^|])\|(?!\|)/;
-
 /**
- * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when a pipe follows the anchor
- * directly (the code is the pipe's last command) unless the command starts with `set -o pipefail`. A chain `anchor && other`
- * that exits 0 ran the anchor to success, so its code stands.
+ * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when something after the anchor
+ * can replace it: `||`, `;`, a newline, or a pipe straight after the anchor unless the command starts with `set -o pipefail`.
+ * A chain `anchor && other` keeps a failed anchor's code, so it stands.
  */
 export function anchorExit(command: string, anchor: string, exit: number | null): number | "unknown" {
-	if (/^\s*set\s+-o\s+pipefail\b/.test(command)) return exit ?? "unknown";
-	const after = command.slice(command.indexOf(anchor) + anchor.length).split(/&&|\|\||;|\n/)[0];
-	return PIPE.test(after) ? "unknown" : (exit ?? "unknown");
+	if (exit === null) return "unknown";
+	const at = command.indexOf(anchor);
+	const rest = at < 0 ? "" : command.slice(at + anchor.length);
+	const pipefail = /^\s*set\s+-o\s+pipefail\b/.test(command);
+	let chained = false;
+	// `&&` keeps a failed anchor's exit; `||`, `;`, and a newline can replace it, and so can a pipe
+	// straight after the anchor unless pipefail is set.
+	for (const [separator] of rest.matchAll(/&&|\|\||\||;|\n/g)) {
+		if (separator === "&&") chained = true;
+		else if (separator === "|") {
+			if (!chained && !pipefail) return "unknown";
+		} else return "unknown";
+	}
+	return exit;
 }
 
 /** The text a `Reality anchor:` line states in an assistant message, if any. */
@@ -404,7 +413,7 @@ export default function (pi: ExtensionAPI) {
 		for (const task of latestTasks(book.entries)) {
 			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: exit ?? "unknown", last });
 		}
-		if (exit === 0 && /\bgit\b[^|;&]*\b(merge|cherry-pick|pull)\b/.test(command) && book.entries.at(-1)?.stage !== "edit") {
+		if (exit === 0 && /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.test(command) && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {

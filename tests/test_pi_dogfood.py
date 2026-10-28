@@ -45,6 +45,19 @@ class TestActEvidence(BookCase):
         self.assertEqual(len(out["notices"]), 1)
         self.assertEqual(out["notices"][0]["step"], len(out["results"]) - 1)
 
+    def test_read_only_git_commands_and_no_op_pulls_are_not_act(self):
+        self.replay([
+            *self.open_loop(anchor="pytest"),
+            bash_result("git merge-base HEAD origin/master", 0, "abc"),
+            bash_result("git merge --abort", 0, ""),
+            bash_result("git config pull.rebase false", 0, ""),
+            bash_result("git log -- pi/pull.ts", 0, ""),
+            bash_result("git pull", 0, "Already up to date."),
+        ])
+        self.assertEqual(self.entries("edit"), [])
+        self.replay([bash_result("git -C /tmp/x pull --ff-only", 0, "Fast-forward")])
+        self.assertEqual([e["via"] for e in self.entries("edit")], ["merge"])
+
     def test_a_successful_git_merge_cherry_pick_or_pull_counts_as_act_and_a_failed_one_does_not(self):
         self.replay([*self.open_loop(anchor="pytest"), bash_result("git merge feature", 1, "conflict")])
         self.assertEqual(self.entries("edit"), [])
@@ -90,9 +103,11 @@ class TestAnchorChains(BookCase):
     def test_pipefail_makes_the_exit_code_trustworthy(self):
         self.assertEqual(self.exits("set -o pipefail; pytest -q 2>&1 | tail -3", 1), [1])
 
-    def test_or_and_semicolon_chains_keep_their_exit_code(self):
-        self.assertEqual(self.exits("pytest -q || true", 0), [0])
-        self.assertEqual(self.exits("pytest -q; echo x", 0), [0, 0])
+    def test_or_semicolon_and_later_pipes_after_or_hide_the_anchor_exit(self):
+        self.assertEqual(self.exits("pytest -q || true", 0)[-1], "unknown")
+        self.assertEqual(self.exits("set -o pipefail; pytest -q || true", 0)[-1], "unknown")
+        self.assertEqual(self.exits("set -o pipefail; pytest -q | tail; true", 0)[-1], "unknown")
+        self.assertEqual(self.exits("pytest -q && git commit -m x", 1)[-1], 1)
 
 
 class TestCloseOutput(BookCase):

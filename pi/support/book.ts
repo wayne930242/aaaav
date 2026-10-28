@@ -120,8 +120,19 @@ export function openLoop(who: Who, env: NodeJS.ProcessEnv = process.env): Book |
 	return book && !isClosed(book) ? book : undefined;
 }
 
+function openForAppend(path: string): number {
+	try {
+		return openSync(path, "a");
+	} catch (error) {
+		// Another session's sweep may remove the directory between mkdir and open; recreate it once.
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		mkdirSync(dirname(path), { recursive: true });
+		return openSync(path, "a");
+	}
+}
+
 function appendBytes(path: string, text: string): void {
-	const fd = openSync(path, "a");
+	const fd = openForAppend(path);
 	try {
 		const bytes = Buffer.from(text);
 		const written = writeSync(fd, bytes);
@@ -211,37 +222,45 @@ export function sweep(env: NodeJS.ProcessEnv = process.env, cwd?: string): Sweep
 	const slug = cwd ? projectSlug(cwd) : undefined;
 	const linked = new Set<string>();
 	const children: Book[] = [];
+	// Other sessions create and tidy books concurrently, so a directory or file can vanish mid-walk; skip it.
 	for (const project of readdirSync(root)) {
-		const dir = join(root, project);
-		if (!statSync(dir).isDirectory()) continue;
-		for (const file of readdirSync(dir)) {
-			if (!file.endsWith(".yml")) continue;
-			const book = parseBook(join(dir, file));
-			if (!book) continue;
-			if (sessionGone(book)) {
-				deleteBook(book.path);
-				result.deleted.push(book.path);
-				continue;
+		try {
+			const dir = join(root, project);
+			if (!statSync(dir).isDirectory()) continue;
+			for (const file of readdirSync(dir)) {
+				if (!file.endsWith(".yml")) continue;
+				const book = parseBook(join(dir, file));
+				if (!book) continue;
+				if (sessionGone(book)) {
+					deleteBook(book.path);
+					result.deleted.push(book.path);
+					continue;
+				}
+				if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
+				for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
 			}
-			if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
-			for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
-		}
-		const agents = join(dir, "agents");
-		if (existsSync(agents)) {
-			for (const file of readdirSync(agents)) {
-				const child = file.endsWith(".yml") ? parseBook(join(agents, file)) : undefined;
-				if (child) children.push(child);
+			const agents = join(dir, "agents");
+			if (existsSync(agents)) {
+				for (const file of readdirSync(agents)) {
+					const child = file.endsWith(".yml") ? parseBook(join(agents, file)) : undefined;
+					if (child) children.push(child);
+				}
 			}
+		} catch {
+			// Vanished under a concurrent tidy.
 		}
 	}
 	for (const child of children) {
-		if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
-		deleteBook(child.path);
-		result.deleted.push(child.path);
+		try {
+			if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
+			deleteBook(child.path);
+			result.deleted.push(child.path);
+		} catch {
+			// Vanished under a concurrent tidy.
+		}
 	}
 	for (const project of readdirSync(root)) {
 		const dir = join(root, project);
-		if (!statSync(dir).isDirectory()) continue;
 		removeIfEmpty(join(dir, "agents"));
 		removeIfEmpty(dir);
 	}
