@@ -9,19 +9,11 @@ Every entry skill (`answering`, `investigating`, `inspecting`, `coding`, `writin
 
 ## Align
 
-In an open loop, open with one working interpretation in your own words:
-
-    Alignment: <the requested task and intended outcome>
-
-Pick the entry's playbook from its index; with none fitting, run the loop bare. `todo` holds real work items only, optionally with `metadata.anchor` (a task's own check) and `metadata.ref` (`<path>#<heading>`). The first `todo` create opens a loop: declare its kind with `anchorloop_stage` (`quick`, `inline`, `reviewed`, `durable`), report stages there, and `close` it once each open todo has `metadata.followup` (a ticket id, `memory`, or `drop — <reason>`).
+Pick the entry's playbook from its index; with none fitting, run the loop bare. `todo` holds real work items only, optionally with `metadata.anchor` (a task's own check) and `metadata.ref` (`<path>#<heading>`). The first `todo` create opens a loop. Declare with `anchorloop_stage` only what the extension cannot observe: `kind` (`quick`, `inline`, `reviewed`, `durable`; `intent`, the task and its outcome in one line; `anchor`, the check command), `verify` (a check that is not a command), `fresh-read`, `friction`, `reflect`, `skip` or `back` (phase, reason), `close`, and the query `read`. Edits, anchor runs, reviews, and spec files are read from evidence; a phase that starts before an earlier one is complete warns once, and `close` refuses only while an open todo lacks `metadata.followup` (a ticket id, `memory`, or `drop — <reason>`).
 
 ## Anchor
 
-In an open loop, before the first change, state:
-
-    Reality anchor: <the exact check that observes the result, and its checkpoint>
-
-The extension warns when `write` or `edit` outside `scratch/` and `docs/specs/` runs before this line or an `anchor` stage.
+Before the first change the loop has an anchor: `anchor` on the `kind` call, or a `Reality anchor: <the exact check that observes the result, and its checkpoint>` line.
 
 Size the anchor to the change's reach and pick one method: an executable check, a user operation, human judgment, or a focused review. A coordinator's anchor governs. Pick a review anchor when the change touches a shared contract, authorization or permission data, a migration, or security; other changes rest on their check and the author's own read of the diff. A review anchor names the realistic use it judges against and blocks on P0 and P1 findings only, recording lower ones as follow-ups. Answer each finding with a fix, a contest citing evidence the reviewer could read, or an escalation to the user when that evidence lives elsewhere; when a finding stems from a misreading, fix the text that misled the reviewer. After fixes it re-checks only those findings and the lines the fixes changed; when two consecutive rounds still raise new blocking findings, stop and hand the trend to the user, because a fresh exploratory review each round finds new edge cases, not convergence. The checkpoint is normally once, after the last increment.
 
@@ -37,13 +29,7 @@ The reply names a [principle](PRINCIPLES.md) only with the decision it changed.
 
 ### Friction Notes
 
-Each time an attempt fails and a later attempt reveals why, append a note before continuing:
-
-    - Tried: <the attempt that failed>
-      Found: <what the failure revealed>
-      Led by: <the skill or instruction line that prompted the attempt, or `none`>
-
-Keep them in `scratch/friction.md` unless the entry names another.
+Each time an attempt fails and a later attempt reveals why, record it with `anchorloop_stage friction` before continuing.
 
 ### Decision Trail
 
@@ -55,13 +41,13 @@ Exercise the anchor and report what it observed. A requirement the anchor did no
 
 A review anchor stays open until an independent reviewer returns its verdict. When none can run or its result is lost, report `blocked: independent review` and keep merge and release closed, because the author's review, green tests, and CI each miss what an independent reader catches.
 
-Write the reply the playbook's `Reply:` line names, with the anchor's evidence. The Jev second thought suggests the next stage and is advisory: recheck the evidence it questions, then decide. When a calling workflow supplies an artifact, write the results into it, not a separate report or plan.
+Write the reply the playbook's `Reply:` line names, with the anchor's evidence. The Jev second thought reports the next phase and is advisory: recheck the evidence it questions, then decide. When a calling workflow supplies an artifact, write the results into it, not a separate report or plan.
 
 ### Reflexive Pass
 
-Run only when friction notes exist; otherwise say nothing. Classify each note: **misdirection** when the `Led by` line states or implies something `Found` contradicts; **gap** when no instruction in use states the `Found` fact. A gap the change itself resolved, or a tool slip no instruction owns, is recorded as resolved. Invoke `solid-loop` with the rest.
+Run only when the book holds friction (`read` lists it); otherwise say nothing. Classify each entry with `reflect`: **misdirection** when the `led_by` line states or implies something `found` contradicts; **gap** when no instruction in use states the `found` fact. A gap the change itself resolved, or a tool slip no instruction owns, is `resolved`. Invoke `solid-loop` with the rest.
 
-**Complete when:** every requirement has evidence from its anchor or is reported `unknown`, and every friction note is applied through `solid-loop` or recorded as resolved.
+**Complete when:** every requirement has evidence from its anchor or is reported `unknown`, and every friction entry is applied through `solid-loop` or reflected as resolved.
 
 ## Playbooks
 
