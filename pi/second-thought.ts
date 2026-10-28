@@ -12,31 +12,13 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-	type Book,
-	allFriction,
-	childLines,
-	currentIntent,
-	currentKind,
-	diffAgainstBases,
-	diffText,
-	guarded,
-	isOpenTask,
-	latestAnchor,
-	openLoop,
-	replayTodos,
-	reviewClearAfterLastAct,
-	reviewTrend,
-	stagesDone,
-	TASK_LEGEND,
-	taskLines,
-	verifyAfterLastAct,
-} from "./support/book.ts";
+import { currentKind, guarded, openLoop } from "./support/book.ts";
 import { type Answers, classify } from "./support/jev.ts";
-import { computePhases } from "./support/phases.ts";
+import { type Snapshot, snapshot } from "./support/snapshot.ts";
 import { isSubagent } from "./support/subagent.ts";
 
-export { isSubagent };
+export { isSubagent, snapshot };
+export type { Snapshot };
 
 export const ENTRY_TYPE = "anchorloop-second-thought";
 const WAIT_TOOLS = new Set(["MonitorCreate", "LoopCreate", "goal_wait", "subagent", "subagent_resume", "subagent_send"]);
@@ -114,52 +96,6 @@ export function readVerdict(answers: Answers): Verdict | undefined {
 	};
 }
 
-export type Snapshot = {
-	state: Record<string, string>;
-	/** The program's next phase and what it lacks, in a few words. */
-	next: string;
-	missing: string;
-	/** Advisory hints that are not phases, such as an unrecorded friction. */
-	hints: string[];
-	/** The last phase the book shows complete. */
-	current: string;
-	/** A review recorded after the last change with no blocking finding on it. */
-	reviewClear: boolean;
-};
-
-export function snapshot(book: Book, ctx: { cwd: string; sessionManager: { getBranch(): unknown[] } }): Snapshot {
-	const { entries } = book;
-	const todos = replayTodos(ctx.sessionManager.getBranch());
-	const open = todos.filter(isOpenTask).length;
-	const phases = computePhases(book, { cwd: ctx.cwd, todos });
-	const check = verifyAfterLastAct(entries);
-	const verify = [
-		`stages: ${stagesDone(entries).join(", ") || "none"}`,
-		`last check: ${check ? `${check.declared ? `declared ${check.result}` : `exit ${check.exit ?? "unknown"}`}${check.last ? ` — ${check.last}` : ""}` : "none after the last change"}`,
-		`reviews: ${reviewTrend(entries)}`,
-		...childLines(entries).map((line) => `child ${line}`),
-	].join("; ");
-	const friction = allFriction(entries).map((item) => `${item.ref}: ${item.tried} → ${item.found} [${item.reflected ? item.class : "unreflected"}]`);
-	return {
-		state: {
-			kind: currentKind(entries) ?? "not declared",
-			intent: (currentIntent(entries) ?? "not declared").slice(0, 500),
-			anchor: (latestAnchor(entries) ?? "none").slice(0, 500),
-			diff: diffText(diffAgainstBases(entries)),
-			phase: `current: ${phases.current}; next: ${phases.next}${phases.missing ? `; missing: ${phases.missing}` : ""}${phases.skipped.length ? `; skipped: ${phases.skipped.join(", ")}` : ""}`.slice(0, 600),
-			verify: verify.slice(0, 1200),
-			todos: `${open} open of ${todos.length}`,
-			tasks: [`legend: ${TASK_LEGEND}`, ...taskLines(entries, todos, ctx.cwd)].join("\n").slice(0, 1500),
-			friction: (friction.join("\n") || "none").slice(0, 800),
-		},
-		next: phases.next,
-		missing: phases.missing,
-		hints: phases.hints,
-		current: phases.current,
-		reviewClear: reviewClearAfterLastAct(entries),
-	};
-}
-
 export function assess(verdict: Verdict, snap: Snapshot): { found: string[]; notes: string[] } {
 	const found: string[] = [];
 	const notes: string[] = [];
@@ -229,15 +165,17 @@ export default function (pi: ExtensionAPI) {
 	pi.on(
 		"tool_result",
 		guarded(async (event, ctx) => {
-			const snap = closing.get(event.toolCallId);
-			if (!snap) return;
-			closing.delete(event.toolCallId);
+			const called = closing.get(event.toolCallId);
+			if (called) closing.delete(event.toolCallId);
 			if (event.isError) return;
+			// The close tool reports the loop as it stood when it closed, after any reflect that ran beside it.
+			const snap = (event.details as { snapshot?: Snapshot } | undefined)?.snapshot ?? called;
+			if (!snap) return;
 			const judgment = await judge(ctx, snap);
 			if (!judgment?.verdict) return;
 			const { found, notes } = assess(judgment.verdict, snap);
 			pi.appendEntry(ENTRY_TYPE, { ...judgment.verdict, at: "close", concerns: found });
-			return { content: [...event.content, { type: "text" as const, text: message(judgment.verdict, snap, found, notes, true) }] };
+			return { content: [...event.content, { type: "text" as const, text: `\n${message(judgment.verdict, snap, found, notes, true)}` }] };
 		}),
 	);
 

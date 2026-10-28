@@ -219,7 +219,9 @@ class TestSkipAndBack(PhaseCase):
         out = self.replay([*self.open_loop(), stage(stage="skip", phase="anchor", reason="no check"), edit(), stage(stage="back", phase="act", reason="redo"), edit(),
                            stage(stage="skip", phase="verify", reason="docs"), stage(stage="close", verdict="landed")])
         text = text_of(out["results"][-1])
-        self.assertIn("skipped anchor (no check), verify (docs); back act (redo)", text)
+        self.assertIn("anchor skipped (no check)", text)
+        self.assertIn("verify skipped (docs)", text)
+        self.assertIn("back act (redo)", text)
         data = out["appended"][0]["data"]
         self.assertEqual((data["skipped"], data["back"]), (["anchor (no check)", "verify (docs)"], ["act (redo)"]))
 
@@ -230,8 +232,10 @@ class TestCloseAndReflect(PhaseCase):
         text = text_of(out["results"][-1])
         self.assertIn("Loop closed (landed)", text)
         warning = text.splitlines()[-1]
-        self.assertTrue(warning.startswith("anchorloop: close comes before act (a change to the code); verify ("), warning)
-        self.assertIn("skip with `anchorloop_stage skip act <reason>`", warning)
+        self.assertTrue(warning.startswith("anchorloop: closed with phases not shown complete: act (a change to the code); verify ("), warning)
+        self.assertNotIn("skip with", text)
+        self.assertIn("act not shown complete", text)
+        self.assertIn("anchor done", text)
 
     def test_closing_as_abandoned_or_blocked_is_not_a_jump(self):
         out = self.replay([*self.open_loop(anchor="pytest -q"), stage(stage="close", verdict="abandoned")])
@@ -239,7 +243,7 @@ class TestCloseAndReflect(PhaseCase):
 
     def test_a_quick_loop_gets_one_reminder_at_close_and_nothing_before(self):
         out = self.replay([*self.open_loop("quick", anchor="make lint"), edit(), stage(stage="close", verdict="landed")])
-        self.assertTrue(text_of(out["results"][-1]).splitlines()[-1].startswith("anchorloop: closing a quick loop with check ("))
+        self.assertTrue(text_of(out["results"][-1]).splitlines()[-1].startswith("anchorloop: closed with phases not shown complete: check ("))
 
     def test_reflect_is_the_last_phase_before_close_and_completes_when_every_friction_has_a_reflect(self):
         self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok")])
@@ -251,7 +255,7 @@ class TestCloseAndReflect(PhaseCase):
         out = self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok"), stage(stage="friction", tried="a", found="b"), stage(stage="close", verdict="landed")])
         text = text_of(out["results"][-1])
         self.assertIn("Unreflected friction for the Reflexive Pass: 1 (b)", text)
-        self.assertIn("anchorloop: close comes before reflect (1 friction entry without a reflect)", text)
+        self.assertIn("anchorloop: closed with phases not shown complete: reflect (1 friction entry without a reflect)", text)
 
     def test_reflect_can_be_skipped(self):
         self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok"), stage(stage="friction", tried="a", found="b")])

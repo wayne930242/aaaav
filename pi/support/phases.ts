@@ -19,8 +19,10 @@ import {
 	currentKind,
 	lastActIndex,
 	lastIndex,
+	repoRootOf,
 	retryWithoutFriction,
 	specFolder,
+	withChildActs,
 } from "./book.ts";
 
 export const SEQUENCES: Record<Kind, readonly string[]> = {
@@ -30,7 +32,7 @@ export const SEQUENCES: Record<Kind, readonly string[]> = {
 	durable: ["decide", "grill", "spec", "read", "approve", "design", "anchor", "act", "verify", "review", "reflect", "close"],
 };
 
-export type Status = { name: string; state: "done" | "skipped" | "missing"; note: string };
+export type Status = { name: string; state: "done" | "skipped" | "missing"; note: string; /** Skipped by the evidence itself (no open rows, no friction), not by a `skip` declaration. */ auto?: boolean };
 
 export type Phases = {
 	kind: Kind | "undeclared";
@@ -66,11 +68,17 @@ function within(root: string, target: string): boolean {
 	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/** Scratch and spec folders in the project and temp files outside it; a project that lives in a temp dir is still counted. */
+/**
+ * True for a file that is not code work: scratch and spec folders of the project or of any git repo the file lives in, and
+ * temp files outside every repo. A file inside a git repo counts as work wherever the repo is, even under a temp dir.
+ */
 export function outsideWork(filePath: string, cwd: string): boolean {
 	const root = real(cwd);
 	const target = real(resolve(cwd, filePath));
-	if (within(root, target)) return EXEMPT_IN_PROJECT.some((dir) => within(join(root, dir), target));
+	const inFolders = (base: string) => EXEMPT_IN_PROJECT.some((dir) => within(join(base, dir), target));
+	if (within(root, target)) return inFolders(root);
+	const repo = repoRootOf(target);
+	if (repo) return inFolders(repo);
 	return EXEMPT_ROOTS.some((tmp) => within(real(tmp), target));
 }
 
@@ -155,7 +163,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 			const open = Number((decision.counts as Record<string, number>).open ?? 0);
 			if (open > 0) return missing(name, `${open} open decision row${open === 1 ? "" : "s"}`);
 			const first = entries.find((entry) => entry.stage === "decision" && entry.auto === true);
-			return first && Number((first.counts as Record<string, number>).open ?? 0) === 0 ? { name, state: "skipped", note: "no open rows" } : done(name);
+			return first && Number((first.counts as Record<string, number>).open ?? 0) === 0 ? { name, state: "skipped", note: "no open rows", auto: true } : done(name);
 		}
 		case "spec": {
 			const spec = artifact(ctx, "spec", from);
@@ -194,8 +202,10 @@ function evaluate(name: string, ctx: Ctx): Status {
 				return missing(name, command ? `a passing run of \`${command}\` after the last change` : "a verify declaration or a run of the anchor");
 			}
 			const entry = entries[index];
-			if (entry.declared === true) return entry.result === "fail" ? missing(name, "the declared verify failed") : done(name, "declared");
-			return entry.exit === 0 ? done(name) : missing(name, `the anchor exited ${entry.exit ?? "unknown"} after the last change`);
+			if (entry.declared === true && entry.result === "fail") return missing(name, "the declared verify failed");
+			if (entry.declared !== true && entry.exit !== 0) return missing(name, `the anchor exited ${entry.exit ?? "unknown"} after the last change`);
+			if (ctx.seq.includes("decide") && !artifact(ctx, "verification", from)) return missing(name, `${ctx.folder ?? "docs/specs/<folder>"}/verification.md (a durable loop's verify also needs it)`);
+			return done(name, entry.declared === true ? "declared" : "");
 		}
 		case "review": {
 			const index = lastWhere(entries, Math.max(from, ctx.lastAct + 1), (entry) => entry.stage === "review");
@@ -208,7 +218,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 		}
 		case "reflect": {
 			const items = allFriction(entries, ctx.env);
-			if (items.length === 0) return { name, state: "skipped", note: "no friction" };
+			if (items.length === 0) return { name, state: "skipped", note: "no friction", auto: true };
 			const open = items.filter((item) => !item.reflected).length;
 			return open === 0 ? done(name) : missing(name, `${open} friction entr${open === 1 ? "y" : "ies"} without a reflect`);
 		}
@@ -221,7 +231,8 @@ function evaluate(name: string, ctx: Ctx): Status {
 export function computePhases(book: Pick<Book, "entries">, inputs: Omit<Inputs, "entries">): Phases {
 	const kind = currentKind(book.entries);
 	const seq = SEQUENCES[kind ?? "inline"];
-	const ctx: Ctx = { ...inputs, entries: book.entries, seq, folder: specFolder(book.entries, inputs.todos, inputs.cwd), lastAct: lastActIndex(book.entries) };
+	const entries = withChildActs(book.entries);
+	const ctx: Ctx = { ...inputs, entries, seq, folder: specFolder(entries, inputs.todos, inputs.cwd), lastAct: lastActIndex(entries) };
 	const statuses = seq.filter((name) => name !== "close").map((name) => evaluate(name, ctx));
 	let prefix = 0;
 	while (prefix < statuses.length && statuses[prefix].state !== "missing") prefix++;
@@ -230,8 +241,8 @@ export function computePhases(book: Pick<Book, "entries">, inputs: Omit<Inputs, 
 	let next = first ? first.name : "close";
 	let note = first ? first.note : "";
 	const last = ctx.lastAct;
-	const verify = book.entries.map((entry, index) => ({ entry, index })).filter(({ entry, index }) => index > last && (entry.stage === "verify" || entry.stage === "check")).at(-1)?.entry;
-	const review = book.entries.map((entry, index) => ({ entry, index })).filter(({ entry, index }) => index > last && entry.stage === "review").at(-1)?.entry;
+	const verify = entries.map((entry, index) => ({ entry, index })).filter(({ entry, index }) => index > last && (entry.stage === "verify" || entry.stage === "check")).at(-1)?.entry;
+	const review = entries.map((entry, index) => ({ entry, index })).filter(({ entry, index }) => index > last && entry.stage === "review").at(-1)?.entry;
 	if ((next === "verify" || next === "check") && last >= 0 && verify && verify.exit !== 0 && verify.declared !== true) next = "fix";
 	else if (next === "review" && last >= 0 && review?.blocking === true) next = "fix";
 	if (next === "fix") note = first?.note ?? "";

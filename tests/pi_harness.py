@@ -31,7 +31,7 @@ const [extensionUrls, cwd, stepsJson, branchJson, classifyJson, sessionId, sessi
 const handlers = {};
 const tools = {};
 const branch = JSON.parse(branchJson);
-const out = { results: [], classifyCalls: [], questionSets: [], notices: [], appended: [] };
+const out = { results: [], classifyCalls: [], questionSets: [], notices: [], appended: [], emitted: [] };
 const pi = {
   on: (event, fn) => { (handlers[event] ??= []).push(fn); },
   registerTool: (tool) => { tools[tool.name] = tool; },
@@ -83,6 +83,8 @@ for (const step of JSON.parse(stepsJson)) {
     } else if (step.tool) {
       const result = await tools[step.tool].execute("t1", step.params, undefined, undefined, ctx);
       out.results.push(result ?? null);
+      // `emit` also hands the tool's result to the tool_result handlers, as pi does after a tool runs.
+      if (step.emit) out.emitted.push(await dispatch("tool_result", { toolName: step.tool, toolCallId: step.emit, input: step.params, content: result.content, details: result.details, isError: false }));
     } else {
       out.results.push((await dispatch(step.event, step.payload ?? {})) ?? null);
     }

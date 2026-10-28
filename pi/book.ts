@@ -1,5 +1,5 @@
 /**
- * pi extension: the loop book. The first `todo` create opens a loop and its book. The agent declares only
+ * pi extension: the loop book. The first `todo` create or `kind` declaration opens a loop and its book. The agent declares only
  * what the program cannot observe (`kind` with its intent and anchor command, a non-command `verify`,
  * `fresh-read`, `friction`, `reflect`, `skip`, `back`, `close`); the extension derives the rest from
  * evidence: production edits, the exit code of the anchor command, reviewer results, durable artifacts,
@@ -48,7 +48,8 @@ import {
 	verifyAfterLastAct,
 } from "./support/book.ts";
 import { classify } from "./support/jev.ts";
-import { JumpMemory, SEQUENCES, computePhases, describe, incompleteBefore, jumpLine, outsideWork } from "./support/phases.ts";
+import { SEQUENCES, computePhases, describe, incompleteBefore, outsideWork } from "./support/phases.ts";
+import { type Snapshot, snapshot } from "./support/snapshot.ts";
 import { isSubagent } from "./support/subagent.ts";
 
 export const SESSION_ENTRY = "anchorloop-loop";
@@ -113,6 +114,19 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
+const PIPE = /(^|[^|])\|(?!\|)/;
+
+/**
+ * The exit to record for a bash call that ran `anchor`: the call's exit code, except `unknown` when a pipe follows the anchor
+ * directly (the code is the pipe's last command) unless the command starts with `set -o pipefail`. A chain `anchor && other`
+ * that exits 0 ran the anchor to success, so its code stands.
+ */
+export function anchorExit(command: string, anchor: string, exit: number | null): number | "unknown" {
+	if (/^\s*set\s+-o\s+pipefail\b/.test(command)) return exit ?? "unknown";
+	const after = command.slice(command.indexOf(anchor) + anchor.length).split(/&&|\|\||;|\n/)[0];
+	return PIPE.test(after) ? "unknown" : (exit ?? "unknown");
+}
+
 /** The text a `Reality anchor:` line states in an assistant message, if any. */
 function statedAnchor(message: { role?: string; content?: unknown } | undefined): string | undefined {
 	if (message?.role !== "assistant") return undefined;
@@ -124,14 +138,19 @@ const reply = (text: string) => ({ content: [{ type: "text" as const, text }], d
 
 export default function (pi: ExtensionAPI) {
 	const subagent = isSubagent();
-	const jumps = new JumpMemory();
-
 	function todosOf(ctx: ExtensionContext) {
 		return replayTodos(ctx.sessionManager.getBranch());
 	}
 
 	function phasesOf(book: Book, ctx: ExtensionContext) {
 		return computePhases(book, { cwd: ctx.cwd, todos: todosOf(ctx) });
+	}
+
+	/** The line that tells the agent Jev did not accept a returned subagent as the fresh read, while the read is still open. */
+	function freshReadLine(book: Book, phases: ReturnType<typeof phasesOf>): string[] {
+		const last = [...book.entries].reverse().find((entry) => entry.stage === "goldfish");
+		const open = phases.statuses.find((status) => status.name === "read")?.state === "missing";
+		return open && last?.source === "jev" && last.ok === false ? [`fresh read by ${String(last.child || "a subagent")} judged not fresh — declare \`fresh-read\` if it was`] : [];
 	}
 
 	function summaryLines(book: Book, ctx: ExtensionContext): string[] {
@@ -147,6 +166,7 @@ export default function (pi: ExtensionAPI) {
 			...childLines(book.entries).map((line) => `child ${line}`),
 			...friction.filter((item) => item.owner !== "main").map((item) => `friction ${item.ref}: ${item.tried} → ${item.found}${item.reflected ? ` [${item.class}]` : ""}`),
 			...phases.hints,
+			...freshReadLine(book, phases),
 		];
 	}
 
@@ -185,7 +205,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	function close(book: Book, ctx: ExtensionContext, verdict: string): string {
+	function close(book: Book, ctx: ExtensionContext, verdict: string): { text: string; snapshot?: Snapshot } {
 		const todos = replayTodos(ctx.sessionManager.getBranch());
 		const undisposed = todos.filter((task) => isOpenTask(task) && !validFollowup(task.metadata?.followup));
 		if (undisposed.length > 0) {
@@ -198,21 +218,16 @@ export default function (pi: ExtensionAPI) {
 		const kind = currentKind(book.entries);
 		const phases = phasesOf(book, ctx);
 		const missing = incompleteBefore(phases, "close");
-		const bookId = String(book.header.id);
-		const fresh = jumps.fresh(bookId, "close", missing.map((status) => status.name));
-		const warning =
-			verdict !== "landed" || !missing.length || !fresh
-				? undefined
-				: kind === "quick"
-					? `anchorloop: closing a quick loop with ${missing.map((status) => `${status.name} (${status.note})`).join("; ")} open.`
-					: jumpLine("close", missing);
+		const notice = verdict === "landed" && missing.length ? `anchorloop: closed with phases not shown complete: ${missing.map((status) => `${status.name} (${status.note})`).join("; ")}.` : undefined;
 		const diff = diffAgainstBases(book.entries);
 		const friction = allFriction(book.entries);
+		const phaseList = phases.statuses.map((status) => ({ phase: status.name, state: status.state === "skipped" && status.auto ? "auto-skipped" : status.state === "missing" ? "not shown complete" : status.state, ...(status.state === "skipped" ? { note: status.note } : {}) }));
 		const summary = {
 			intent: currentIntent(book.entries) ?? null,
 			kind: kind ?? null,
 			verdict,
 			stages: stagesDone(book.entries),
+			phases: phaseList,
 			reviewRounds: reviews(book.entries).length,
 			reviewTrend: reviewTrend(book.entries),
 			diff: diff.summary,
@@ -225,20 +240,24 @@ export default function (pi: ExtensionAPI) {
 		const tail = unreflected.length
 			? ` Unreflected friction for the Reflexive Pass: ${unreflected.map((item) => `${item.ref} (${item.found})`).join("; ")}.`
 			: "";
-		const extra = [summary.skipped.length ? `skipped ${summary.skipped.join(", ")}` : "", summary.back.length ? `back ${summary.back.join(", ")}` : ""].filter(Boolean).join("; ");
-		const text = `Loop closed (${verdict}): ${summary.stages.join(", ")}; ${summary.reviewTrend}; diff ${diff.summary}${extra ? `; ${extra}` : ""}.${tail}`;
+		const shown = phaseList.map((item) => `${item.phase} ${item.state}${item.note ? ` (${item.note})` : ""}`).join(", ");
+		const back = summary.back.length ? `; back ${summary.back.join(", ")}` : "";
+		const text = `Loop closed (${verdict}): phases ${shown}; ${summary.reviewTrend}; diff ${diff.summary.split("\n").join("; ")}${back}.${tail}`;
+		const after = notice ? `\n${notice}` : "";
 		if (kept) {
 			// A child's book stays for the main session to read and delete.
 			appendEntry(book.path, "close", { verdict, summary: text.slice(0, 500) });
-			return `${text} The book stays for the main session.${warning ? `\n${warning}` : ""}`;
+			return { text: `${text} The book stays for the main session.${after}` };
 		}
+		// Jev judges the loop as it stood at close; the book is gone by the time the result is judged.
+		const snap = kind === "quick" ? undefined : snapshot(book, ctx);
 		pi.appendEntry(SESSION_ENTRY, summary);
 		for (const id of childIds(book.entries)) {
 			const child = findChildBook(id);
 			if (child) deleteBook(child.path);
 		}
 		deleteBook(book.path);
-		return `${text} The book is deleted. Clear the todo list now (todo action: clear).${warning ? `\n${warning}` : ""}`;
+		return { text: `${text} The book is deleted. Clear the todo list now (todo action: clear).${after}`, snapshot: snap };
 	}
 
 	pi.registerTool({
@@ -275,10 +294,16 @@ export default function (pi: ExtensionAPI) {
 		},
 		async execute(_toolCallId: string, raw: unknown, _signal: unknown, _onUpdate: unknown, ctx: ExtensionContext) {
 			const params = raw as Params;
-			const book = openLoop(ctx);
-			if (!book) return reply("No loop is open, so nothing was recorded. A loop opens with the first `todo` create.");
 			const { stage } = params;
 			if (!(STAGES as readonly string[]).includes(stage)) throw new Error(`unknown stage \`${String(stage)}\`; declare one of ${STAGES.join(", ")}`);
+			let book = openLoop(ctx);
+			if (!book && stage === "kind") {
+				// A todo create in the same batch may not have landed yet; whichever comes first opens the loop.
+				if (!params.kind || !params.intent) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
+				book = createBook(ctx);
+				recordPriorAnchor(book, ctx);
+			}
+			if (!book) return reply("No loop is open, so nothing was recorded. A loop opens with the first `todo` create or `kind`.");
 			const had = currentKind(book.entries);
 			const sequence = SEQUENCES[had ?? "inline"];
 			if (stage === "read") {
@@ -288,7 +313,8 @@ export default function (pi: ExtensionAPI) {
 			}
 			if (stage === "close") {
 				if (!params.verdict) throw new Error("close needs a verdict: landed, blocked, or abandoned");
-				return reply(close(book, ctx, params.verdict));
+				const closed = close(book, ctx, params.verdict);
+				return { content: [{ type: "text" as const, text: closed.text }], details: closed.snapshot ? { snapshot: closed.snapshot } : undefined };
 			}
 			if (stage === "kind") {
 				if (!params.kind && !params.intent && !params.anchor) throw new Error("kind needs `kind`, `intent`, or `anchor`");
@@ -373,11 +399,13 @@ export default function (pi: ExtensionAPI) {
 		const anchor = anchorCommand(book.entries);
 		if (anchor && command.includes(anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
-			const piped = command.slice(command.indexOf(anchor) + anchor.length).includes("|");
-			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: piped ? "unknown" : (exit ?? "unknown"), last }));
+			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
 			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: exit ?? "unknown", last });
+		}
+		if (exit === 0 && /\bgit\b[^|;&]*\b(merge|cherry-pick|pull)\b/.test(command) && book.entries.at(-1)?.stage !== "edit") {
+			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {
 			const cwd = String(book.header.cwd ?? "");
@@ -459,7 +487,22 @@ export default function (pi: ExtensionAPI) {
 		if (reviewsStalled(book.entries)) ctx.ui.notify("anchorloop: two consecutive review rounds still raised blocking findings; stop and hand the trend to the user.", "warning");
 	}
 
-	/** Jev judges whether a returned subagent was a fresh-context read of the spec; the spec path in its brief is only a pre-filter. */
+	const HOST_LINE = /^\s*(Parent action:|Requested model|Session:|Resume:)/i;
+
+/** The text without the lines pi-herdr adds around a subagent brief or result. */
+function strip(text: string): string {
+	return text
+		.split("\n")
+		.filter((line) => !HOST_LINE.test(line))
+		.join("\n")
+		.trim();
+}
+
+function headAndTail(text: string): string {
+	return text.length <= 2500 ? text : `${text.slice(0, 1000)}\n…\n${text.slice(-1500)}`;
+}
+
+/** Jev judges whether a returned subagent was a fresh-context read of the spec; the spec path in its brief is only a pre-filter. */
 	async function detectFreshRead(ctx: ExtensionContext, book: Book, details: { name?: unknown; task?: unknown; resultContent?: unknown }): Promise<void> {
 		const phases = phasesOf(book, ctx);
 		const read = phases.statuses.find((status) => status.name === "read");
@@ -467,11 +510,11 @@ export default function (pi: ExtensionAPI) {
 		const folder = specFolder(book.entries, todosOf(ctx), ctx.cwd);
 		const brief = String(details.task ?? "");
 		if (!folder || !(brief.includes(`${folder}/spec.md`) || brief.includes(resolve(ctx.cwd, folder, "spec.md")))) return;
-		const { answers } = await classify(ctx, { brief: brief.slice(0, 1500), result: textOf(details.resultContent).slice(-2000) }, {
+		const { answers } = await classify(ctx, { brief: strip(brief).slice(0, 1500), result: headAndTail(strip(textOf(details.resultContent))) }, {
 			fresh_read: {
 				type: "bool",
-				instructions: "Was this subagent a fresh-context read of the spec: did its `brief` hand it the spec without the author's reasoning and ask it to restate the contract and list its guesses, and does its `result` do so?",
-				criteria: { true: "the result restates the contract in its own words and lists what it had to guess", false: "the subagent did other work, had the author's context, or only summarized the spec" },
+				instructions: "Did this subagent read the spec and report on it: does its `result` restate the spec, or list gaps, guesses, or questions about it? The `brief` only needs to have handed it the spec.",
+				criteria: { true: "the result restates the spec or lists gaps, guesses, or questions about it", false: "the subagent did other work and its result does not report on the spec" },
 			},
 		});
 		const probability = answers?.fresh_read?.type === "bool" ? answers.fresh_read.probability : undefined;

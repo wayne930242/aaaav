@@ -57,8 +57,22 @@ class BookCase(ExtensionCase):
 
 class TestLifecycle(BookCase):
     def test_nothing_is_recorded_without_a_loop(self):
-        out = self.replay([stage(stage="kind", kind="inline", intent="x"), stage(stage="read")])
+        out = self.replay([stage(stage="read"), stage(stage="friction", tried="a", found="b")])
         self.assertIn("No loop is open", text_of(out["results"][0]))
+        self.assertIn("No loop is open", text_of(out["results"][1]))
+        self.assertEqual(self.book_files(), [])
+
+    def test_kind_opens_the_loop_itself_when_a_todo_create_in_the_same_batch_has_not_landed(self):
+        out = self.replay([stage(stage="kind", kind="inline", intent="x", anchor="pytest"), todo_create(), stage(stage="read")])
+        self.assertIn("kind: inline", text_of(out["results"][0]))
+        self.assertEqual(len(self.book_files()), 1)
+        self.assertEqual([e["stage"] for e in self.book()[1]], ["kind", "anchor", "task"])
+        self.assertIsNone(out["results"][1])
+        self.assertTrue(text_of(out["results"][2]).startswith("inline · phase anchor ✓ → act"))
+
+    def test_a_kind_call_that_cannot_open_a_loop_creates_no_book(self):
+        out = self.replay([stage(stage="kind", kind="inline")])
+        self.assertIn("intent", out["results"][0]["error"])
         self.assertEqual(self.book_files(), [])
 
     def test_the_first_todo_create_opens_a_loop_and_a_later_one_extends_it(self):
@@ -379,15 +393,19 @@ class TestFriction(BookCase):
         self.assertEqual((reflect["friction"], reflect["class"], reflect["action"]), (["1"], "gap", "solid-loop"))
 
     def test_a_failed_anchor_run_followed_by_a_pass_is_a_retry_pair_that_asks_for_a_friction_note(self):
-        steps = [*self.open_loop(anchor="pytest"), edit(), bash_result("pytest", 1, "1 failed"), edit(), bash_result("pytest", 0, "ok")]
+        steps = [*self.open_loop(anchor="pytest"), edit(), bash_result("pytest", 0, "ok"), edit(), bash_result("pytest", 1, "1 failed"), edit(), bash_result("pytest", 0, "ok")]
         self.assertIn("friction: a failed run was retried and passed", self.read_text(steps))
 
+    def test_red_first_failures_before_any_pass_are_not_retries(self):
+        steps = [*self.open_loop(anchor="pytest"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 0, "ok")]
+        self.assertNotIn("retried and passed", self.read_text(steps))
+
     def test_a_friction_entry_after_the_retry_clears_the_hint(self):
-        steps = [*self.open_loop(anchor="pytest"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 0, "ok"), stage(stage="friction", tried="a", found="b")]
+        steps = [*self.open_loop(anchor="pytest"), bash_result("pytest", 0, "ok"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 0, "ok"), stage(stage="friction", tried="a", found="b")]
         self.assertNotIn("retried and passed", self.read_text(steps))
 
     def test_a_task_anchor_run_counts_for_retry_pairs(self):
-        steps = [todo_create("t", anchor="pytest -q x"), stage(stage="kind", kind="inline", intent="x"), bash_result("pytest -q x", 1, "bad"), bash_result("pytest -q x", 0, "ok")]
+        steps = [todo_create("t", anchor="pytest -q x"), stage(stage="kind", kind="inline", intent="x"), bash_result("pytest -q x", 0, "ok"), bash_result("pytest -q x", 1, "bad"), bash_result("pytest -q x", 0, "ok")]
         self.assertIn("retried and passed", self.read_text(steps))
 
     def test_close_never_refuses_over_friction_carries_it_into_the_session_entry_and_lists_the_unreflected(self):
