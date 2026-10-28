@@ -299,15 +299,13 @@ export default function (pi: ExtensionAPI) {
 					notes.push(had && params.kind && had !== params.kind ? `kind changed: ${had} → ${params.kind}` : `kind: ${params.kind ?? had}`);
 				}
 				if (params.anchor) {
-					appendEntry(book.path, "anchor", { check: params.anchor, command: true });
+					appendEntry(book.path, "anchor", { check: params.anchor });
 					notes.push(`anchor: ${params.anchor}`);
 				}
 				touchRepo(book, join(ctx.cwd, "_"));
 				return reply(notes.join("\n"));
 			}
 			if (stage === "verify") {
-				const command = anchorCommand(book.entries);
-				if (command) throw new Error(`The anchor is a command (\`${command}\`): its exit code is read from the bash call that runs it; verify declares only a check that is not a command.`);
 				if (!params.note) throw new Error("verify needs a `note` saying what was observed");
 				const result = params.result ?? "pass";
 				const recorded = childId() !== undefined || had === "quick" ? "check" : "verify";
@@ -375,7 +373,8 @@ export default function (pi: ExtensionAPI) {
 		const anchor = anchorCommand(book.entries);
 		if (anchor && command.includes(anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
-			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: exit ?? "unknown", last }));
+			const piped = command.slice(command.indexOf(anchor) + anchor.length).includes("|");
+			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: piped ? "unknown" : (exit ?? "unknown"), last }));
 		}
 		for (const task of latestTasks(book.entries)) {
 			if (typeof task.anchor === "string" && command.includes(task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: exit ?? "unknown", last });
@@ -435,11 +434,13 @@ export default function (pi: ExtensionAPI) {
 		}),
 	);
 
-	async function recordReview(ctx: ExtensionContext, book: Book, name: string, text: string): Promise<void> {
+	async function recordReview(ctx: ExtensionContext, book: Book, name: string, text: string, failed: boolean): Promise<void> {
 		const counts = parseBlocking(text);
 		let blocking: boolean | null = null;
 		let source = `reviewer ${name}`;
-		if (!counts) {
+		if (failed || /\bStatus:?\*{0,2}\s*INCOMPLETE\b/i.test(text)) {
+			source = "failed";
+		} else if (!counts) {
 			source = "jev";
 			const { answers } = await classify(ctx, { review: text.slice(-3000) }, {
 				blocking: {
@@ -453,7 +454,7 @@ export default function (pi: ExtensionAPI) {
 		} else {
 			blocking = counts.p0 + counts.p1 > 0;
 		}
-		const entry = appendEntry(book.path, "review", { round: reviews(book.entries).length + 1, ...(counts ?? {}), blocking, source });
+		const entry = appendEntry(book.path, "review", { round: reviews(book.entries).length + 1, ...(source === "failed" ? {} : (counts ?? {})), blocking, source });
 		book.entries.push(entry);
 		if (reviewsStalled(book.entries)) ctx.ui.notify("anchorloop: two consecutive review rounds still raised blocking findings; stop and hand the trend to the user.", "warning");
 	}
@@ -481,14 +482,18 @@ export default function (pi: ExtensionAPI) {
 	pi.on(
 		"message_end",
 		guarded(async (event, ctx) => {
-			const message = event.message as { role?: string; content?: unknown; customType?: string; details?: { agent?: unknown; name?: unknown; task?: unknown; resultContent?: unknown } };
+			const message = event.message as { role?: string; content?: unknown; customType?: string; details?: { agent?: unknown; name?: unknown; task?: unknown; resultContent?: unknown; error?: unknown; errorMessage?: unknown; exitCode?: unknown } };
 			const book = openLoop(ctx);
 			if (!book) return;
 			const stated = statedAnchor(message);
 			if (stated && !book.entries.some((entry) => entry.stage === "anchor" && entry.check === stated)) appendEntry(book.path, "anchor", { check: stated, line: true });
 			if (message.role !== "custom" || message.customType !== "subagent_result" || subagent) return;
 			const agent = String(message.details?.agent ?? "");
-			if (REVIEWERS.has(agent)) await recordReview(ctx, book, String(message.details?.name ?? agent), textOf(message.details?.resultContent));
+			if (REVIEWERS.has(agent)) {
+				const d = message.details ?? {};
+				const failed = Boolean(d.error) || Boolean(d.errorMessage) || (typeof d.exitCode === "number" && d.exitCode !== 0);
+				await recordReview(ctx, book, String(d.name ?? agent), textOf(d.resultContent), failed);
+			}
 			else await detectFreshRead(ctx, book, message.details ?? {});
 		}),
 	);

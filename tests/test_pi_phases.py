@@ -36,7 +36,7 @@ class TestSequences(PhaseCase):
         durable = self.line(self.open_loop("durable"), session="s-durable")
         self.assertEqual(quick, "quick · phase start → act (missing: a change to the code)")
         self.assertTrue(inline.startswith("inline · phase start → anchor (missing: a `Reality anchor:` line"), inline)
-        self.assertEqual(durable, "durable · phase start → decide (missing: decision.md with decision rows (no spec folder recorded))")
+        self.assertEqual(durable, "durable · phase start → decide (missing: decision.md with decision rows (no spec folder: name it in `intent` by calling `kind` again))")
 
     def test_an_inline_loop_walks_anchor_act_verify_and_regresses_when_the_code_changes_again(self):
         steps = self.open_loop(anchor="pytest -q")
@@ -63,16 +63,16 @@ class TestSequences(PhaseCase):
     def test_a_declared_verify_completes_the_phase_of_a_loop_whose_anchor_is_not_a_command(self):
         stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: the page shows the new column"}]}}}
         self.replay([*self.open_loop(), stated, edit()])
-        self.assertEqual(self.line([]), "inline · phase act ✓ → verify (missing: a verify declaration (the anchor is not a command))")
+        self.assertEqual(self.line([]), "inline · phase act ✓ → verify (missing: a passing run of `the page shows the new column` after the last change)")
         self.assertEqual(self.line([stage(stage="verify", note="the column is there")]), "inline · phase verify ✓ → close")
         self.assertIn("phase act ✓ → verify", self.line([edit(), bash_result("ls", 0, "x")]))
 
-    def test_the_reality_anchor_line_counts_as_the_anchor_phase_and_never_as_a_command(self):
-        stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Alignment: x\nReality anchor: pytest tests/x.py, once at the end"}]}}}
+    def test_the_reality_anchor_line_counts_as_the_anchor_phase_and_a_command_in_it_is_observed(self):
+        stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Alignment: x\nReality anchor: pytest tests/x.py"}]}}}
         self.replay([*self.open_loop(), stated, edit(), bash_result("pytest tests/x.py", 0, "ok")])
         self.assertEqual(self.entries("anchor")[0]["line"], True)
-        self.assertEqual(self.entries("verify"), [])
-        self.assertIn("phase act ✓ → verify (missing: a verify declaration", self.line([]))
+        self.assertEqual([e["exit"] for e in self.entries("verify")], [0])
+        self.assertEqual(self.line([]), "inline · phase verify ✓ → close")
 
     def test_a_bare_reality_anchor_line_still_counts(self):
         stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor:\n- pytest"}]}}}
@@ -103,6 +103,14 @@ class TestDurable(PhaseCase):
         self.replay([self.artifact("spec.md", spec_text("approved", True))])
         self.assertTrue(self.line([]).startswith("durable · phase anchor ✓ → act (missing: a change to the code)"))
         self.assertIn("phase read ✓ → approve (missing: spec.md Status: approved with Approved from (now proposed))", self.line([self.artifact("spec.md", spec_text("proposed"))]))
+
+    def test_amending_an_approved_spec_that_stays_approved_keeps_read(self):
+        # RV2-F003
+        for name, text in (("decision.md", DONE_ROWS), ("spec.md", spec_text("approved", True)), ("design.md", DESIGN)):
+            self.artifact(name, text)
+        self.replay(self.open_loop("durable", intent=f"implement {DIR}", anchor="pytest -q"))
+        line = self.line([self.artifact("spec.md", spec_text("approved", True) + "\nAmendment 1.\n")])
+        self.assertEqual(line, "durable · phase anchor ✓ → act (missing: a change to the code)")
 
     def test_a_spec_that_names_no_approval_is_not_approved(self):
         self.replay([*self.open_loop("durable"), self.artifact("decision.md", DONE_ROWS), self.artifact("spec.md", spec_text("proposed")), stage(stage="fresh-read")])

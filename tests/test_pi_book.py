@@ -85,7 +85,7 @@ class TestLifecycle(BookCase):
     def test_the_kind_call_carries_the_anchor_command_and_a_later_call_sets_it_again(self):
         self.replay([*self.open_loop("inline", anchor="pytest -q"), stage(stage="kind", anchor="make test")])
         anchors = self.entries("anchor")
-        self.assertEqual([(a["check"], a["command"]) for a in anchors], [("pytest -q", True), ("make test", True)])
+        self.assertEqual([a["check"] for a in anchors], ["pytest -q", "make test"])
         self.assertEqual(len(self.entries("kind")), 1)
 
     def test_the_first_kind_needs_a_kind_and_an_intent(self):
@@ -163,7 +163,7 @@ class TestEvidence(BookCase):
     def test_a_bash_call_that_runs_the_anchor_command_records_its_exit_code_and_last_line(self):
         self.replay([
             *self.open_loop(anchor="pytest -q"),
-            bash_result("cd tests && pytest -q 2>&1 | tail", 1, "collected 3\n1 failed\n"),
+            bash_result("cd tests && pytest -q", 1, "collected 3\n1 failed\n"),
             bash_result("ls", 0, "files\n"),
             bash_result("pytest -q", 0, "3 passed\n"),
         ])
@@ -194,8 +194,17 @@ class TestEvidence(BookCase):
         self.assertIn("note", out["results"][2]["error"])
         (verify,) = self.entries("verify")
         self.assertEqual((verify["declared"], verify["result"], verify["exit"]), (True, "pass", 0))
-        out = self.replay([stage(stage="kind", anchor="pytest -q"), stage(stage="verify", note="looked fine")])
-        self.assertIn("The anchor is a command", out["results"][1]["error"])
+
+    def test_a_declared_verify_is_accepted_for_a_command_anchor_and_a_later_failing_run_overrides_it(self):
+        # RV2-F001
+        out = self.replay([*self.open_loop(anchor="pytest -q"), stage(stage="verify", note="looked fine"), bash_result("pytest -q", 1, "1 failed")])
+        self.assertNotIn("error", out["results"][2])
+        self.assertEqual([(e.get("declared"), e["exit"]) for e in self.entries("verify")], [(True, 0), (None, 1)])
+
+    def test_an_anchor_run_piped_on_records_an_unknown_exit(self):
+        # RV2-F004
+        self.replay([*self.open_loop(anchor="pytest -q"), bash_result("pytest -q 2>&1 | tail -3", 0, "2 failed, 10 passed")])
+        self.assertEqual([e["exit"] for e in self.entries("verify")], ["unknown"])
 
     def test_a_production_edit_is_recorded_once_per_burst_and_other_files_are_not(self):
         self.replay([*self.open_loop(), edit("src/a.py"), edit("src/b.py"), edit("README.md"), edit("scratch/x.py"), edit("docs/specs/2026-10-29-x/notes.md")])
@@ -289,6 +298,20 @@ class TestReview(BookCase):
     def test_without_a_blocking_line_or_a_jev_key_the_finding_state_is_unknown(self):
         self.replay([*self.open_loop("reviewed"), reviewer_result("looks fine")], classify="no-auth")
         self.assertIsNone(self.rounds()[0]["blocking"])
+
+    def test_a_failed_cancelled_or_incomplete_reviewer_result_is_never_a_clear_round(self):
+        # RV2-F002
+        def failed(**details) -> dict:
+            message = {"role": "custom", "customType": "subagent_result", "details": {"name": "r1", "agent": "reviewer", "resultContent": "Blocking: P0=0 P1=0", **details}}
+            return {"event": "message_end", "payload": {"message": message}}
+
+        out = self.replay([
+            *self.open_loop("reviewed"),
+            failed(error="cancelled"), failed(errorMessage="boom"), failed(exitCode=1),
+            reviewer_result("**Status:** INCOMPLETE\n\nBlocking: P0=0 P1=0"),
+        ], classify=answers(blocking=0.1))
+        self.assertEqual([(e["blocking"], e["source"]) for e in self.rounds()], [(None, "failed")] * 4)
+        self.assertEqual(out["classifyCalls"], [])
 
     def test_only_the_main_session_records_reviews(self):
         env = {"PI_SUBAGENT_ID": "kid", "PI_SUBAGENT_NAME": "w", "PI_SUBAGENT_SESSION": str(self.session_file)}
@@ -548,6 +571,17 @@ class TestSweep(BookCase):
         self.start()
         self.assertTrue(fresh.exists())
         self.assertFalse(old.exists())
+
+    def test_a_book_older_than_seven_days_goes_even_when_its_session_file_exists(self):
+        # RV2-F005
+        main = self.books / "proj" / "old-main.yml"
+        child = self.books / "proj" / "agents" / "old-kid.yml"
+        self.write_book(main, str(self.session_file))
+        self.write_book(child, str(self.session_file))
+        for path in (main, child):
+            os.utime(path, (1, 1))
+        self.start()
+        self.assertFalse(main.exists() or child.exists())
 
     def test_only_the_open_books_of_this_project_are_listed(self):
         # RV-F010: a book of another project is neither deleted nor listed.

@@ -147,7 +147,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 	switch (name) {
 		case "decide": {
 			const decision = artifact(ctx, "decision", from);
-			return total(decision?.counts) > 0 ? done(name) : missing(name, ctx.folder ? `${ctx.folder}/decision.md with decision rows` : "decision.md with decision rows (no spec folder recorded)");
+			return total(decision?.counts) > 0 ? done(name) : missing(name, ctx.folder ? `${ctx.folder}/decision.md with decision rows` : "decision.md with decision rows (no spec folder: name it in `intent` by calling `kind` again)");
 		}
 		case "grill": {
 			const decision = artifact(ctx, "decision", from);
@@ -167,6 +167,8 @@ function evaluate(name: string, ctx: Ctx): Status {
 			const index = lastWhere(entries, Math.max(from, start + 1), (entry) => entry.stage === "goldfish" && entry.ok !== false);
 			if (index >= 0) return done(name, String(entries[index].source ?? ""));
 			const wrote = entries.some((entry) => entry.stage === "spec" && entry.auto === true);
+			const specs = entries.filter((entry) => entry.stage === "spec" && entry.auto === true);
+			if (specs.length > 0 && start >= 0 && entries[start].status === "approved" && !entries.slice(0, start).some((entry) => entry.stage === "spec" && entry.status === "proposed")) return done(name, "spec approved");
 			if (!wrote && from === 0 && artifact(ctx, "spec", 0)?.status === "approved") return done(name, "spec approved before this loop");
 			return missing(name, "a fresh-context read of the spec (dispatch a subagent, or `anchorloop_stage fresh-read`)");
 		}
@@ -189,7 +191,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 			const index = lastWhere(entries, Math.max(from, ctx.lastAct + 1), (entry) => entry.stage === "verify" || entry.stage === "check");
 			if (index < 0) {
 				const command = anchorCommand(entries);
-				return missing(name, command ? `a passing run of \`${command}\` after the last change` : "a verify declaration (the anchor is not a command)");
+				return missing(name, command ? `a passing run of \`${command}\` after the last change` : "a verify declaration or a run of the anchor");
 			}
 			const entry = entries[index];
 			if (entry.declared === true) return entry.result === "fail" ? missing(name, "the declared verify failed") : done(name, "declared");

@@ -23,6 +23,7 @@ export type Who = {
 	sessionManager: { getSessionId?(): string; getSessionFile?(): string | undefined; getBranch(): unknown[] };
 };
 
+const STALE_BOOK_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_UNSAVED_MS = 24 * 60 * 60 * 1000;
 
 export function booksRoot(env: NodeJS.ProcessEnv = process.env): string {
@@ -176,6 +177,7 @@ export function deleteBook(path: string): void {
 export type Sweep = { deleted: string[]; open: string[] };
 
 function sessionGone(book: Book): boolean {
+	if (Date.now() - statSync(book.path).mtimeMs > STALE_BOOK_MS) return true;
 	const session = book.header.session;
 	return typeof session === "string" ? !existsSync(session) : Date.now() - statSync(book.path).mtimeMs > STALE_UNSAVED_MS;
 }
@@ -284,10 +286,9 @@ export function reviewClearAfterLastAct(entries: Entry[]): boolean {
 	return review >= 0 && review > lastActIndex(entries) && entries[review].blocking === false;
 }
 
-/** The latest anchor command, the one a bash call is matched against; a stated `Reality anchor:` line is prose and never matches. */
+/** The latest anchor text, matched against bash commands; an anchor that never occurs in a command is verified by declaration. */
 export function anchorCommand(entries: Entry[]): string | undefined {
-	const found = [...entries].reverse().find((entry) => entry.stage === "anchor" && entry.command === true && typeof entry.check === "string");
-	return found?.check as string | undefined;
+	return latestAnchor(entries);
 }
 
 /** The latest anchor of either kind, for display. */
