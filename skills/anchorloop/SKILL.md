@@ -9,7 +9,7 @@ Every entry skill (`answering`, `investigating`, `inspecting`, `coding`, `writin
 
 ## Align
 
-Pick the entry's playbook from its index; with none fitting, run the loop bare. `todo` holds real work items only, optionally with `metadata.anchor` (a task's own check) and `metadata.ref` (`<path>#<heading>`). The first `todo` create opens a loop. Declare with `anchorloop_stage` only what the extension cannot observe: `kind` (`quick`, `inline`, `reviewed`, `durable`; `intent`, the task and its outcome in one line; `anchor`, the check command), `verify` (a check not run in bash), `fresh-read`, `friction`, `reflect`, `skip` or `back` (phase, reason), `close`, and the query `read`. Edits, anchor runs, reviews, and spec files are read from evidence; a phase that starts before an earlier one is complete warns once, and `close` refuses only while an open todo lacks `metadata.followup` (a ticket id, `memory`, or `drop — <reason>`).
+Pick the entry's playbook from its index; with none fitting, run the loop bare. `todo` holds real work items only, optionally with `metadata.anchor` (a task's own check) and `metadata.ref` (`<path>#<heading>`). The first `todo` create opens a loop. Declare with `anchorloop_stage` only what the extension cannot observe: `kind` (`quick`, `inline`, `reviewed`, `durable`; `intent`, the task and its outcome in one line; `anchor`, the check command), `verify` (a check not run in bash), `fresh-read`, `friction`, `reflect`, `skip` or `back` (phase, reason), and `close`. Edits, anchor runs, reviews, and spec files are read from evidence; a phase that starts before an earlier one is complete warns once (`read` if you disagree), and `close` refuses only while an open todo lacks `metadata.followup` (a ticket id, `memory`, or `drop — <reason>`).
 
 ## Anchor
 
@@ -45,7 +45,7 @@ Write the reply the playbook's `Reply:` line names, with the anchor's evidence. 
 
 ### Reflexive Pass
 
-Run only when the book holds friction (`read` lists it); otherwise say nothing. Classify each entry with `reflect`: **misdirection** when the `led_by` line states or implies something `found` contradicts; **gap** when no instruction in use states the `found` fact. A gap the change itself resolved, or a tool slip no instruction owns, is `resolved`. Invoke `solid-loop` with the rest.
+Run only when the book holds friction; otherwise say nothing. Classify each entry with `reflect`: **misdirection** when the `led_by` line states or implies something `found` contradicts; **gap** when no instruction in use states the `found` fact. A gap the change itself resolved, or a tool slip no instruction owns, is `resolved`. Invoke `solid-loop` with the rest.
 
 **Complete when:** every requirement has evidence from its anchor or is reported `unknown`, and every friction entry is applied through `solid-loop` or reflected as resolved.
 
