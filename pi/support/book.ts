@@ -7,7 +7,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmdirSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, constants, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -120,19 +120,21 @@ export function openLoop(who: Who, env: NodeJS.ProcessEnv = process.env): Book |
 	return book && !isClosed(book) ? book : undefined;
 }
 
-function openForAppend(path: string): number {
+/** Opens `path` for appending; only a new book may create the file, so a book swept away is never recreated without its header. */
+function openForAppend(path: string, create: boolean): number {
+	const flags = create ? "a" : constants.O_WRONLY | constants.O_APPEND;
 	try {
-		return openSync(path, "a");
+		return openSync(path, flags);
 	} catch (error) {
-		// Another session's sweep may remove the directory between mkdir and open; recreate it once.
-		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		// Another session's sweep may remove the directory between mkdir and open; a new book recreates it once.
+		if (!create || (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 		mkdirSync(dirname(path), { recursive: true });
-		return openSync(path, "a");
+		return openSync(path, flags);
 	}
 }
 
-function appendBytes(path: string, text: string): void {
-	const fd = openForAppend(path);
+function appendBytes(path: string, text: string, create = false): void {
+	const fd = openForAppend(path, create);
 	try {
 		const bytes = Buffer.from(text);
 		const written = writeSync(fd, bytes);
@@ -144,7 +146,12 @@ function appendBytes(path: string, text: string): void {
 
 export function createBook(who: Who, env: NodeJS.ProcessEnv = process.env): Book {
 	const path = bookPath(who, env);
-	if (existsSync(path)) deleteBook(path);
+	if (existsSync(path)) {
+		// A child's closed book is kept for main to read; a new loop of the child must not delete it.
+		const old = parseBook(path);
+		if (childId(env) && old && isClosed(old)) setAside(path);
+		else deleteBook(path);
+	}
 	mkdirSync(dirname(path), { recursive: true });
 	const child = childId(env);
 	const header = {
@@ -156,25 +163,58 @@ export function createBook(who: Who, env: NodeJS.ProcessEnv = process.env): Book
 		opened: new Date().toISOString(),
 	};
 	const lines = ["# anchorloop loop book", ...Object.entries(header).map(([key, value]) => `${key}: ${JSON.stringify(value)}`), "entries:", ""];
-	appendBytes(path, lines.join("\n"));
+	appendBytes(path, lines.join("\n"), true);
 	return { path, header, entries: [] };
 }
 
 export function appendEntry(path: string, stage: string, fields: Record<string, unknown> = {}): Entry {
 	const entry: Entry = { ts: new Date().toISOString(), stage, ...fields };
-	appendBytes(path, `- ${JSON.stringify(entry)}\n`);
+	try {
+		appendBytes(path, `- ${JSON.stringify(entry)}\n`);
+	} catch (error) {
+		// The book was swept or deleted under this session; there is nothing left to record in.
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+	}
 	return entry;
 }
 
-/** The book of the child `id` among all projects, or undefined. */
-export function findChildBook(id: string, env: NodeJS.ProcessEnv = process.env): Book | undefined {
+const ASIDE = /^(.+)\.closed-(\d+)$/;
+
+/** Renames a closed book to the next free `<id>.closed-<n>.yml`, which main reads with the child's later loops. */
+function setAside(path: string): void {
+	const stem = basename(path, ".yml");
+	let n = 1;
+	while (existsSync(join(dirname(path), `${stem}.closed-${n}.yml`))) n++;
+	renameSync(path, join(dirname(path), `${stem}.closed-${n}.yml`));
+}
+
+export type ChildBook = { book: Book; tag: string };
+
+/** The books of the child `id` among all projects: its earlier closed loops (`~1`, `~2`) in order, then the current one (no tag). */
+export function findChildBooks(id: string, env: NodeJS.ProcessEnv = process.env): ChildBook[] {
 	const root = booksRoot(env);
-	if (!existsSync(root)) return undefined;
+	if (!existsSync(root)) return [];
+	const found: ChildBook[] = [];
 	for (const project of readdirSync(root)) {
-		const book = parseBook(join(root, project, "agents", `${safe(id)}.yml`));
-		if (book) return book;
+		const agents = join(root, project, "agents");
+		let files: string[];
+		try {
+			files = readdirSync(agents);
+		} catch {
+			continue;
+		}
+		const aside = files
+			.map((file) => ASIDE.exec(basename(file, ".yml")))
+			.filter((match): match is RegExpExecArray => match !== null && match[1] === safe(id))
+			.sort((a, b) => Number(a[2]) - Number(b[2]));
+		for (const match of aside) {
+			const book = parseBook(join(agents, `${match[0]}.yml`));
+			if (book) found.push({ book, tag: `~${match[2]}` });
+		}
+		const book = parseBook(join(agents, `${safe(id)}.yml`));
+		if (book) found.push({ book, tag: "" });
 	}
-	return undefined;
+	return found;
 }
 
 function removeIfEmpty(dir: string): boolean {
@@ -229,15 +269,19 @@ export function sweep(env: NodeJS.ProcessEnv = process.env, cwd?: string): Sweep
 			if (!statSync(dir).isDirectory()) continue;
 			for (const file of readdirSync(dir)) {
 				if (!file.endsWith(".yml")) continue;
-				const book = parseBook(join(dir, file));
-				if (!book) continue;
-				if (sessionGone(book)) {
-					deleteBook(book.path);
-					result.deleted.push(book.path);
-					continue;
+				try {
+					const book = parseBook(join(dir, file));
+					if (!book) continue;
+					if (sessionGone(book)) {
+						deleteBook(book.path);
+						result.deleted.push(book.path);
+						continue;
+					}
+					if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
+					for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
+				} catch {
+					// This book vanished; the rest of the project still counts.
 				}
-				if (!slug || project === slug) result.open.push(`${book.path} (${currentKind(book.entries) ?? "no kind"}: ${currentIntent(book.entries) ?? "no intent"})`);
-				for (const entry of book.entries) if (entry.stage === "link" && typeof entry.child === "string") linked.add(safe(entry.child));
 			}
 			const agents = join(dir, "agents");
 			if (existsSync(agents)) {
@@ -252,7 +296,8 @@ export function sweep(env: NodeJS.ProcessEnv = process.env, cwd?: string): Sweep
 	}
 	for (const child of children) {
 		try {
-			if (linked.has(basename(child.path, ".yml")) || !sessionGone(child)) continue;
+			const stem = basename(child.path, ".yml");
+			if (linked.has(ASIDE.exec(stem)?.[1] ?? stem) || !sessionGone(child)) continue;
 			deleteBook(child.path);
 			result.deleted.push(child.path);
 		} catch {
@@ -304,8 +349,7 @@ export function lastIndex(entries: Entry[], ...stages: string[]): number {
 export function withChildActs(entries: Entry[], env: NodeJS.ProcessEnv = process.env): Entry[] {
 	const acts: Entry[] = [];
 	for (const id of childIds(entries)) {
-		const child = findChildBook(id, env);
-		if (child) acts.push(...child.entries.filter((entry) => entry.stage === "edit").map((entry) => ({ ...entry, child: id })));
+		for (const { book } of findChildBooks(id, env)) acts.push(...book.entries.filter((entry) => entry.stage === "edit").map((entry) => ({ ...entry, child: id })));
 	}
 	if (acts.length === 0) return entries;
 	acts.sort((a, b) => a.ts.localeCompare(b.ts));
@@ -380,13 +424,13 @@ export function childLines(entries: Entry[], env: NodeJS.ProcessEnv = process.en
 	const lines: string[] = [];
 	for (const id of childIds(entries)) {
 		const link = entries.find((entry) => entry.stage === "link" && entry.child === id);
-		const child = findChildBook(id, env);
-		if (!child) continue;
-		const lastCheck = [...child.entries].reverse().find((entry) => entry.stage === "check" || entry.stage === "verify");
-		const friction = frictionOf(child.entries).length;
-		lines.push(
-			`${link?.name ?? id}: ${currentKind(child.entries) ?? "no kind"}${isClosed(child) ? " (closed)" : ""}; stages ${stagesDone(child.entries).join(", ") || "none"}; ${lastCheck ? evidenceLine(lastCheck) : "no check"}${friction ? `; ${friction} friction` : ""}`,
-		);
+		for (const { book: child, tag } of findChildBooks(id, env)) {
+			const lastCheck = [...child.entries].reverse().find((entry) => entry.stage === "check" || entry.stage === "verify");
+			const friction = frictionOf(child.entries).length;
+			lines.push(
+				`${link?.name ?? id}${tag}: ${currentKind(child.entries) ?? "no kind"}${isClosed(child) ? " (closed)" : ""}; stages ${stagesDone(child.entries).join(", ") || "none"}; ${lastCheck ? evidenceLine(lastCheck) : "no check"}${friction ? `; ${friction} friction` : ""}`,
+			);
+		}
 	}
 	return lines;
 }
@@ -419,13 +463,13 @@ function item(owner: string, ref: string, entry: Entry, reflect: Entry | undefin
 export function allFriction(entries: Entry[], env: NodeJS.ProcessEnv = process.env): FrictionItem[] {
 	const items = frictionOf(entries).map((entry) => item("main", String(entry.id), entry, coveringReflect(entries, [String(entry.id)])));
 	for (const id of childIds(entries)) {
-		const child = findChildBook(id, env);
-		if (!child) continue;
 		const link = entries.find((entry) => entry.stage === "link" && entry.child === id);
-		const label = String(link?.name ?? id);
-		for (const entry of frictionOf(child.entries)) {
-			const reflect = coveringReflect(entries, [`${label}#${entry.id}`, `${id}#${entry.id}`]) ?? coveringReflect(child.entries, [String(entry.id)]);
-			items.push(item(label, `${label}#${entry.id}`, entry, reflect));
+		for (const { book: child, tag } of findChildBooks(id, env)) {
+			const label = `${String(link?.name ?? id)}${tag}`;
+			for (const entry of frictionOf(child.entries)) {
+				const reflect = coveringReflect(entries, [`${label}#${entry.id}`, `${id}${tag}#${entry.id}`]) ?? coveringReflect(child.entries, [String(entry.id)]);
+				items.push(item(label, `${label}#${entry.id}`, entry, reflect));
+			}
 		}
 	}
 	return items;

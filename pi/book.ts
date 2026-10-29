@@ -26,7 +26,7 @@ import {
 	currentKind,
 	deleteBook,
 	diffAgainstBases,
-	findChildBook,
+	findChildBooks,
 	frictionOf,
 	guarded,
 	isOpenTask,
@@ -321,8 +321,7 @@ export default function (pi: ExtensionAPI) {
 		const snap = kind === "quick" ? undefined : snapshot(book, ctx);
 		pi.appendEntry(SESSION_ENTRY, summary);
 		for (const id of childIds(book.entries)) {
-			const child = findChildBook(id);
-			if (child) deleteBook(child.path);
+			for (const { book: child } of findChildBooks(id)) deleteBook(child.path);
 		}
 		deleteBook(book.path);
 		return { text: `${text} The book is deleted. Clear the todo list now (todo action: clear).${after}`, snapshot: snap };
