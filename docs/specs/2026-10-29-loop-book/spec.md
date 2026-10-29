@@ -136,3 +136,10 @@ The agent declares only what the program cannot observe; everything observable i
 - `quick` has no phase warnings; its only prompt is the close reminder.
 - Every warning and second-thought message is one line, once per phase jump or judgment; a repeated identical one is suppressed.
 - Skill text gets shorter: the Align and Anchor ritual lines, the `Inline — Contract:` line in coding, and the Friction Notes format block are replaced by one paragraph naming the declarations. `skills/anchorloop/SKILL.md` and `skills/coding/SKILL.md` must end shorter than at 9034242.
+
+## Amendment: 2.2.3 follow-ups (user 2026-10-29)
+
+- The skill no longer promotes `anchorloop_stage read` as a routine step; it names `read` once, for when an advisory and the agent's view disagree. `Status: approved` stays self-written; no approval check is added.
+- A child that closed its loop and opens another keeps the closed book as `<id>.closed-<n>.yml` beside the new one; main's `read` lists both (`name~n` for the earlier loops) and main's close or the sweep removes them with the child.
+- A run counts only where its exit can be the call's: not inside `$(`, `<(` or `>(` (except the whole of `x=$(run)`); an `||` or `!` before any enclosing group makes the exit unknown. Unrecognized is the fail-safe outcome.
+- TTSR: a match that blocks a tool call ignores the repeat policy; reminders and prose injections keep it. Rule text renders literally.
