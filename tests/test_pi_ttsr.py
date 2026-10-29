@@ -113,27 +113,50 @@ class TestPiTtsr(unittest.TestCase):
         ])
         self.assertEqual(out["results"], [None, None])
 
-    def test_once_mode_fires_a_rule_only_once(self):
+    def test_once_mode_reminds_only_once_while_a_blocking_rule_blocks_every_matching_call(self):
+        self.user_rule("no-git-stash", GIT_STASH_RULE.replace('scope: "tool:bash"', 'scope: "tool:bash"\ninterruptMode: never'))
+        result = lambda call_id: {"event": "tool_result", "payload": {"toolCallId": call_id, "content": [{"type": "text", "text": "ok"}]}}
+        out = self.run_steps([tool_call("git stash", call_id="c1"), result("c1"), tool_call("git stash pop", call_id="c2"), result("c2")])
+        self.assertEqual(len(out["results"][1]["content"]), 2)
+        self.assertIsNone(out["results"][3])
+
+    def test_a_blocking_rule_blocks_the_second_matching_call_in_the_same_turn(self):
         self.user_rule("no-git-stash", GIT_STASH_RULE)
         out = self.run_steps([tool_call("git stash", call_id="c1"), tool_call("git stash pop", call_id="c2")])
         self.assertTrue(out["results"][0]["block"])
-        self.assertIsNone(out["results"][1])
+        self.assertTrue(out["results"][1]["block"])
 
-    def test_after_gap_mode_refires_after_gap_turns(self):
-        self.user_rule("no-git-stash", GIT_STASH_RULE.replace('scope: "tool:bash"', 'scope: "tool:bash"\nrepeatMode: after-gap\nrepeatGap: 2'))
-        out = self.run_steps([
-            tool_call("git stash", call_id="c1"),
-            {"event": "turn_end"},
-            tool_call("git stash", call_id="c2"),
-            {"event": "turn_end"},
-            tool_call("git stash", call_id="c3"),
-        ])
+    def test_a_blocking_after_gap_rule_blocks_the_second_call_in_a_turn_and_the_first_after_a_restore(self):
+        rule = GIT_STASH_RULE.replace('scope: "tool:bash"', 'scope: "tool:bash"\nrepeatMode: after-gap\nrepeatGap: 3')
+        self.user_rule("no-git-stash", rule)
+        out = self.run_steps([tool_call("gh x git stash", call_id="c1"), tool_call("git stash pop", call_id="c2")])
+        self.assertTrue(out["results"][0]["block"] and out["results"][1]["block"])
+        branch = [{"type": "custom", "customType": "ttsr_injection", "data": {"rules": ["no-git-stash"]}}]
+        out = self.run_steps([tool_call("git stash")], branch)
         self.assertTrue(out["results"][0]["block"])
-        self.assertIsNone(out["results"][2])
-        self.assertTrue(out["results"][4]["block"])
 
-    def test_restored_session_entries_suppress_once_rules(self):
-        self.user_rule("no-git-stash", GIT_STASH_RULE)
+    def test_replacement_patterns_in_rule_text_are_rendered_literally(self):
+        body = "Use $& and $` and $' and $$ and $1 as written."
+        self.user_rule("no-git-stash", GIT_STASH_RULE.replace("Prove a red test by copying the file to /tmp and restoring it.", body))
+        out = self.run_steps([tool_call("git stash")])
+        self.assertIn(body, out["results"][0]["reason"])
+
+    def test_after_gap_mode_reminds_again_after_gap_turns(self):
+        self.user_rule("no-git-stash", GIT_STASH_RULE.replace('scope: "tool:bash"', 'scope: "tool:bash"\ninterruptMode: never\nrepeatMode: after-gap\nrepeatGap: 2'))
+        result = lambda call_id: {"event": "tool_result", "payload": {"toolCallId": call_id, "content": []}}
+        out = self.run_steps([
+            tool_call("git stash", call_id="c1"), result("c1"),
+            {"event": "turn_end"},
+            tool_call("git stash", call_id="c2"), result("c2"),
+            {"event": "turn_end"},
+            tool_call("git stash", call_id="c3"), result("c3"),
+        ])
+        self.assertIsNotNone(out["results"][1])
+        self.assertIsNone(out["results"][4])
+        self.assertIsNotNone(out["results"][7])
+
+    def test_restored_session_entries_suppress_once_reminders(self):
+        self.user_rule("no-git-stash", GIT_STASH_RULE.replace('scope: "tool:bash"', 'scope: "tool:bash"\ninterruptMode: never'))
         branch = [{"type": "custom", "customType": "ttsr_injection", "data": {"rules": ["no-git-stash"]}}]
         out = self.run_steps([tool_call("git stash")], branch)
         self.assertEqual(out["results"], [None])

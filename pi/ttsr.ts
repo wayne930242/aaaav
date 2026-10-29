@@ -84,9 +84,9 @@ User-defined rule matched your previous response. Rule configured not to interru
 
 export function render(template: string, rule: Rule): string {
 	return template
-		.replaceAll("{{name}}", rule.name)
-		.replaceAll("{{path}}", rule.path)
-		.replaceAll("{{content}}", rule.content.trim());
+		.replaceAll("{{name}}", () => rule.name)
+		.replaceAll("{{path}}", () => rule.path)
+		.replaceAll("{{content}}", () => rule.content.trim());
 }
 
 /** Unquote a YAML scalar written plainly, in single quotes, or in double quotes. */
@@ -326,11 +326,14 @@ export class TtsrManager {
 		);
 	}
 
-	/** Rules whose scope, path globs, condition, and repeat policy all admit `content`. */
+	/**
+	 * Rules whose scope, path globs, condition, and repeat policy all admit `content`. A match that blocks a tool call
+	 * ignores the repeat policy: the call must never run, however often the rule has fired.
+	 */
 	check(content: string, context: MatchContext): Rule[] {
 		return this.rules.filter(
 			(rule) =>
-				this.#eligible(rule) &&
+				((context.source === "tool" && interrupts(rule, "tool")) || this.#eligible(rule)) &&
 				this.#inScope(rule, context) &&
 				rule.conditions.some((condition) => {
 					condition.lastIndex = 0;
