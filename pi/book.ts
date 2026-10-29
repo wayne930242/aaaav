@@ -116,43 +116,107 @@ export function bashExit(event: { isError?: boolean; structuredContent?: unknown
 	return named ? Number(named[1]) : null;
 }
 
-/** The command with quoted strings blanked out, keeping every index, so quoted text never counts as a run or a separator. */
+/** The command with quoted strings and comments blanked out, keeping every index, so quoted text never counts as a run or a separator. */
 function unquoted(command: string): string {
 	// One left-to-right pass, so whichever starts first wins: a quote, or a `#` that starts a word and comments out its line.
 	// Newlines inside quotes are kept, since they still separate commands for the scan.
 	return command.replace(/'[^']*'|"(?:\\.|[^"\\])*"|(^|\s)#[^\n]*/g, (span) => span.replace(/[^\n]/g, " "));
 }
 
-/** Text before a run with `VAR=value` and simple wrappers (`uv run`, `time`, `timeout N`, `env`) peeled off its end. */
+/** Runs of spaces and tabs collapsed, so `pytest  -q` is `pytest -q`; applied to the command and the anchor alike. */
+const squeezed = (text: string): string => text.replace(/[ \t]+/g, " ");
+
+/** Text before a run with `VAR=value` and simple wrappers (`uv run`, `time`, `timeout N`, `env`, `npx`, `pnpm exec`, `bunx`) peeled off its end. */
 function beforeRun(text: string): string {
-	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+[^\s;&|]+\s+|\benv\s+)+$/, "");
+	return text.replace(/(\b\w+=\S*\s+|\buv\s+run\s+|\btime\s+|\btimeout\s+[^\s;&|]+\s+|\benv\s+|\b(?:npx|bunx)\s+(?:-\S+\s+)*|\bpnpm\s+exec\s+)+$/, "");
 }
 
 // `cd` and `export` change what a check tests, so they are not setup.
 const SETUP_SEGMENT = /^\s*(\.|source\b|set\b|\w+=)/;
 
+// A command position: the start, after a separator, a `{` or `(`, or after `if`, `then`, `while` and the like.
+const COMMAND_POSITION = /(^|&&|\|\||[;|!\n{(])\s*((if|then|elif|else|while|until|do)\s+)*$/;
+// What voids the exit of a run after it: `x || run` may never run it, `! run` inverts its code.
+const VOIDS_EXIT = /(!|\|\|)\s*(\(\s*|cd\s+\S+\s*&&\s*)*$/;
+// `x=$(run)` as a whole command: the command's exit is the substitution's.
+const ASSIGNMENT = /(^|&&|\|\||[;|!\n{(])(\s*(?:\w+=\S*\s+)*\w+=)$/;
+
+type Opening = { open: number; sub: boolean };
+
+/** The parentheses still open at `at`; `sub` marks `$(`, `<(` and `>(`, whose exit is not the call's. */
+function openings(masked: string, at: number): Opening[] {
+	const stack: Opening[] = [];
+	for (let i = 0; i < at; i++) {
+		if (masked[i] === "(") stack.push({ open: i, sub: i > 0 && "$<>".includes(masked[i - 1]) });
+		else if (masked[i] === ")") stack.pop();
+	}
+	return stack;
+}
+
+/** The text with every closed parenthesized span blanked, so a `set -o pipefail` inside a finished subshell is not seen. */
+function withoutClosedGroups(text: string): string {
+	const chars = [...text];
+	const stack: number[] = [];
+	chars.forEach((char, i) => {
+		if (char === "(") stack.push(i);
+		else if (char === ")" && stack.length > 0) chars.fill(" ", stack.pop() as number, i + 1);
+	});
+	return chars.join("");
+}
+
+type Located = { at: number; anchor: string; masked: string; leads: number[]; depth: number };
+
 /**
- * Where `command` runs `anchor` as a command (at the start, or after `&&`, `||`, `;`, `|`, `!`, `(` or a newline, outside quotes,
- * past any `VAR=value` prefixes), as the last such run, or undefined. The full anchor is tried first; an anchor whose earlier
- * `&&` segments only set up the environment (`. venv/bin/activate && pytest -q`) also matches on its last segment.
+ * Where a run at `at` stands, or undefined when its exit is not the call's: inside `$(`, `<(` or `>(` unless the substitution is the
+ * whole of an assignment (`x=$(run)`). `leads` are the positions whose prefix may void the exit: the run, each enclosing `(`, the assignment.
  */
-export function anchorRun(command: string, anchorText: string): { at: number; anchor: string } | undefined {
-	const masked = unquoted(command);
-	const segments = anchorText.split("&&").map((segment) => segment.trim());
-	const candidates = [anchorText.trim()];
+function placement(masked: string, at: number): Pick<Located, "leads" | "depth"> | undefined {
+	const stack = openings(masked, at);
+	const leads = [at];
+	const subs = stack.filter((group) => group.sub);
+	if (subs.length > 1 || (subs.length === 1 && stack.at(-1) !== subs[0])) return undefined;
+	for (const group of stack) {
+		if (!group.sub) {
+			leads.push(group.open);
+			continue;
+		}
+		const assignment = masked[group.open - 1] === "$" ? ASSIGNMENT.exec(masked.slice(0, group.open - 1)) : null;
+		if (!assignment || beforeRun(masked.slice(group.open + 1, at)).trim() !== "") return undefined;
+		leads.push(assignment.index + assignment[1].length);
+	}
+	return { leads, depth: stack.length };
+}
+
+function locate(command: string, anchorText: string): Located | undefined {
+	const text = squeezed(command);
+	const masked = unquoted(text);
+	const segments = squeezed(anchorText).split("&&").map((segment) => segment.trim());
+	const candidates = [squeezed(anchorText).trim()];
 	if (segments.length > 1 && segments.slice(0, -1).every((segment) => SETUP_SEGMENT.test(segment))) candidates.push(segments.at(-1)!);
 	for (const anchor of candidates) {
 		if (!anchor) continue;
-		let found: number | undefined;
-		for (let at = masked.indexOf(anchor); at >= 0; at = masked.indexOf(anchor, at + 1)) {
-			const before = beforeRun(masked.slice(0, at));
+		let found: Located | undefined;
+		for (let at = text.indexOf(anchor); at >= 0; at = text.indexOf(anchor, at + 1)) {
+			// The anchor's own quotes match the command's; only its first character must lie outside quotes and comments.
+			if (masked.charAt(at) !== text.charAt(at)) continue;
 			const after = masked.charAt(at + anchor.length);
-			// `$(`, `<(`, `>(` substitute output; their exit is not the call's.
-			if (/(^|&&|\|\||[;|!\n]|(^|[^$<>])\()\s*$/.test(before) && (after === "" || /[\s;&|)]/.test(after))) found = at;
+			if (!COMMAND_POSITION.test(beforeRun(masked.slice(0, at))) || !(after === "" || /[\s;&|)]/.test(after))) continue;
+			const where = placement(masked, at);
+			if (where) found = { at, anchor, masked, ...where };
 		}
-		if (found !== undefined) return { at: found, anchor };
+		if (found) return found;
 	}
 	return undefined;
+}
+
+/**
+ * Where `command` runs `anchor` as a command (at the start, or after `&&`, `||`, `;`, `|`, `!`, `(`, `{`, a newline or `then`, outside quotes,
+ * past any `VAR=value` prefixes and wrappers), as the last such run, or undefined. The full anchor is tried first; an anchor whose earlier
+ * `&&` segments only set up the environment (`. venv/bin/activate && pytest -q`) also matches on its last segment.
+ */
+export function anchorRun(command: string, anchorText: string): { at: number; anchor: string } | undefined {
+	const found = locate(command, anchorText);
+	return found && { at: found.at, anchor: found.anchor };
 }
 
 /**
@@ -162,17 +226,15 @@ export function anchorRun(command: string, anchorText: string): { at: number; an
  */
 export function anchorExit(command: string, anchorText: string, exit: number | null): number | "unknown" {
 	if (exit === null) return "unknown";
-	const run = anchorRun(command, anchorText);
+	const run = locate(command, anchorText);
 	if (!run) return "unknown";
-	const masked = unquoted(command);
-	const { at, anchor } = run;
-	// `! anchor` inverts the code and `x || anchor` may never run it.
-	if (/(!|\|\|)\s*(\(\s*|cd\s+\S+\s*&&\s*)*$/.test(beforeRun(masked.slice(0, at)))) return "unknown";
+	const { at, anchor, masked, leads, depth } = run;
+	// `! anchor` inverts the code and `x || anchor` may never run it; the same holds for the group or assignment around it.
+	if (leads.some((lead) => VOIDS_EXIT.test(beforeRun(masked.slice(0, lead))))) return "unknown";
 	// Inside a subshell, a pipefail set or the exit of what follows is not this shell's.
-	const depth = [...masked.slice(0, at)].reduce((open, char) => open + (char === "(" ? 1 : char === ")" ? -1 : 0), 0);
 	const rest = masked.slice(at + anchor.length);
 	// The last `set -o pipefail` or `set +o pipefail` before the anchor decides.
-	const toggles = [...masked.slice(0, at).replace(/\([^()]*\)/g, (sub) => " ".repeat(sub.length)).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
+	const toggles = [...withoutClosedGroups(masked.slice(0, at)).matchAll(/\bset\b[^;&|\n]*?([-+])\w*o\s+pipefail\b/g)];
 	if (depth > 0 && toggles.length === 0 && /\|(?!\|)/.test(rest)) return "unknown";
 	const pipefail = toggles.at(-1)?.[1] === "-";
 	let chained = false;
@@ -185,6 +247,29 @@ export function anchorExit(command: string, anchorText: string, exit: number | n
 		} else return "unknown";
 	}
 	return exit;
+}
+
+const GIT_ARG = String.raw`(?:"[^"]*"|'[^']*'|\S+)`;
+// Global options git accepts before the verb: `-C <dir>`, `-c <k=v>`, `--git-dir=<dir>`, `--no-pager`, and the like.
+const GIT_OPTION = String.raw`\s+(?:-[Cc]\s+${GIT_ARG}|--(?:git-dir|work-tree|namespace|exec-path|config-env)(?:=|\s+)${GIT_ARG}|--(?:no-pager|paginate|no-replace-objects|bare|literal-pathspecs|no-optional-locks)|-p)`;
+const GIT_MERGE = new RegExp(String.raw`\bgit((?:${GIT_OPTION})*)\s+(merge|cherry-pick|pull)(?=\s|$)`, "g");
+// Arguments that make the verb do no work, or end one: only the words up to the next separator count.
+const GIT_NO_WORK = /(^|\s)--(abort|quit|skip|dry-run)\b/;
+
+/** The first `git merge`, `cherry-pick` or `pull` at a command position that does work, with the directory it runs in. */
+export function mergeRun(command: string): { verb: string; dir: string } | undefined {
+	const masked = unquoted(command);
+	for (const match of command.matchAll(GIT_MERGE)) {
+		const at = match.index;
+		if (masked.slice(at, at + 3) !== "git" || !COMMAND_POSITION.test(beforeRun(masked.slice(0, at)))) continue;
+		if (GIT_NO_WORK.test(command.slice(at + match[0].length).split(/[|;&\n]/)[0])) continue;
+		// The repo is the nearest `cd` before the verb, moved on by each `-C` of the verb itself.
+		const cds = [...command.slice(0, at).matchAll(/\bcd\s+(\S+)/g)];
+		const unquote = (word: string) => word.replace(/^(["'])(.*)\1$/, "$2").replace(/^~(?=\/|$)/, homedir());
+		const dirs = [...match[1].matchAll(new RegExp(String.raw`-C\s+(${GIT_ARG})`, "g"))].map((found) => unquote(found[1]));
+		return { verb: match[2], dir: dirs.reduce((base, dir) => resolve(base, dir), unquote(cds.at(-1)?.[1] ?? ".")) };
+	}
+	return undefined;
 }
 
 /** The text a `Reality anchor:` line states in an assistant message, if any. */
@@ -471,13 +556,9 @@ export default function (pi: ExtensionAPI) {
 		for (const task of latestTasks(book.entries)) {
 			if (typeof task.anchor === "string" && anchorRun(command, task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
 		}
-		const merged = /\bgit(\s+-C\s+\S+)?\s+(merge|cherry-pick|pull)(?=\s|$)(?![^|;&]*--(abort|quit)\b)/.exec(command);
-		if (exit === 0 && merged && !/Already up to date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
-			// The repo is the `-C` of the merge itself, else the nearest `cd` before it.
-			const cds = [...command.slice(0, merged.index).matchAll(/\bcd\s+(\S+)/g)];
-			const named = merged[1]?.trim().replace(/^-C\s+/, "") ?? cds.at(-1)?.[1];
-			const dir = named?.replace(/^~(?=\/|$)/, homedir());
-			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), dir ?? "."), merged[2]);
+		const merged = mergeRun(command);
+		if (exit === 0 && merged && !/Already up[ -]to[ -]date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
+			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), merged.dir), merged.verb);
 			book.entries.push(appendEntry(book.path, "edit", { via: "merge" }));
 		}
 		if (exit === 0 && /\bgit\b[^|;&]*\bcommit\b/.test(command) && !book.entries.some((entry) => entry.stage === "edit")) {
