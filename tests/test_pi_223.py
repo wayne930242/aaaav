@@ -124,6 +124,11 @@ class TestAnchorNesting(RunCase):
         self.assertEqual(self.exits("true || x=$(pytest -q)"), ["unknown"])
         self.assertEqual(self.exits("x=$(pytest -q 2>&1 | tail -3)"), ["unknown"])
         self.assertEqual(self.exits("export x=$(pytest -q)"), [])
+        for command in ("x=$(pytest -q) true", "x=$(pytest -q) exit 0", "A=1 x=$(pytest -q) cmd", "x=$(pytest -q) y=$(true)", "x=$(pytest -q)$(true)", "x=$(pytest -q)`true`", "echo { pytest -q }"):
+            with self.subTest(command=command):
+                self.assertIn(self.exits(command), ([], ["unknown"]))
+        self.assertEqual(self.exits("x=$(pytest -q) > out.txt", 1), [1])
+        self.assertEqual(self.exits("{ pytest -q; }", 1)[-1:], ["unknown"])
         self.assertEqual(self.exits("x=$(echo a; pytest -q)"), [])
 
     def test_a_pipefail_in_a_finished_nested_group_does_not_count(self):

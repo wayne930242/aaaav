@@ -135,11 +135,13 @@ function beforeRun(text: string): string {
 const SETUP_SEGMENT = /^\s*(\.|source\b|set\b|\w+=)/;
 
 // A command position: the start, after a separator, a `{` or `(`, or after `if`, `then`, `while` and the like.
-const COMMAND_POSITION = /(^|&&|\|\||[;|!\n{(])\s*((if|then|elif|else|while|until|do)\s+)*$/;
+// A `{` counts only where it opens a group itself, not as a literal argument (`echo { x }`).
+const SEPARATOR_OR_GROUP = String.raw`(?:^|&&|\|\||[;|!\n(])(?:\s*\{)?`;
+const COMMAND_POSITION = new RegExp(String.raw`${SEPARATOR_OR_GROUP}\s*((if|then|elif|else|while|until|do)\s+)*$`);
 // What voids the exit of a run after it: `x || run` may never run it, `! run` inverts its code.
 const VOIDS_EXIT = /(!|\|\|)\s*(\(\s*|cd\s+\S+\s*&&\s*)*$/;
 // `x=$(run)` as a whole command: the command's exit is the substitution's.
-const ASSIGNMENT = /(^|&&|\|\||[;|!\n{(])(\s*(?:\w+=\S*\s+)*\w+=)$/;
+const ASSIGNMENT = new RegExp(String.raw`(${SEPARATOR_OR_GROUP})(\s*(?:\w+=\S*\s+)*\w+=)$`);
 
 type Opening = { open: number; sub: boolean };
 
@@ -164,6 +166,16 @@ function withoutClosedGroups(text: string): string {
 	return chars.join("");
 }
 
+/** The index of the `)` that closes the `(` at `open`, or undefined. */
+function closing(masked: string, open: number): number | undefined {
+	let depth = 0;
+	for (let i = open; i < masked.length; i++) {
+		if (masked[i] === "(") depth++;
+		else if (masked[i] === ")" && --depth === 0) return i;
+	}
+	return undefined;
+}
+
 type Located = { at: number; anchor: string; masked: string; leads: number[]; depth: number };
 
 /**
@@ -182,6 +194,11 @@ function placement(masked: string, at: number): Pick<Located, "leads" | "depth">
 		}
 		const assignment = masked[group.open - 1] === "$" ? ASSIGNMENT.exec(masked.slice(0, group.open - 1)) : null;
 		if (!assignment || beforeRun(masked.slice(group.open + 1, at)).trim() !== "") return undefined;
+		// Only redirects may follow the substitution; a further word, assignment, or substitution makes its own exit the call's.
+		const close = closing(masked, group.open);
+		if (close === undefined) return undefined;
+		const tail = masked.slice(close + 1).split(/&&|\|\||[;|\n]|(?<![<>])&(?![>&])/)[0];
+		if (!/^(\s*\d*[<>]{1,2}&?\s*[^\s$`(<>]+)*\s*$/.test(tail)) return undefined;
 		leads.push(assignment.index + assignment[1].length);
 	}
 	return { leads, depth: stack.length };
