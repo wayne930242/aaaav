@@ -82,6 +82,20 @@ class TestAutoFriction(BookCase):
         self.replay([bash_result("pytest -q", 0, "ok")])
         self.assertEqual([entry["found"] for entry in self.entries("friction")], ["failed with no output"])
 
+    def test_a_backfilled_older_pair_does_not_speak_for_the_newer_failure(self):
+        import json
+        self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok")])
+        book = self.book_files()[0]
+        text = book.read_text()
+        lead = "  - " if "\n  - " in text else "- "
+        # Both pairs stay open only when entries land without a bash call between them, as a book written elsewhere can.
+        for entry in ({"stage": "verify", "command": "pytest -q", "exit": 1, "last": "old failure"}, {"stage": "verify", "command": "pytest -q", "exit": 0, "last": "ok"},
+                      {"stage": "verify", "command": "pytest -q", "exit": 1, "key": "E   new failure", "last": "1 failed"}):
+            text += lead + json.dumps(entry) + "\n"
+        book.write_text(text)
+        self.replay([bash_result("pytest -q", 0, "ok")])
+        self.assertEqual([entry["found"] for entry in self.entries("friction")], ["E   new failure"])
+
     def test_without_an_error_line_the_last_line_is_kept(self):
         self.rerun("compiling\n3 checks did not pass")
         self.assertIn("3 checks did not pass", self.entries("friction")[0]["found"])

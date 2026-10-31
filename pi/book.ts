@@ -680,7 +680,9 @@ export default function (pi: ExtensionAPI) {
 			open.set(command, [...(open.get(command) ?? []), id]);
 		}
 		for (const [command, pairs] of open) {
-			const failed = book.entries[Number(pairs[0].slice(pairs[0].lastIndexOf("#") + 1))];
+			// The newest failure speaks for the entry; an older pair it backfills is listed in `pairs`.
+			const newest = pairs.at(-1) as string;
+			const failed = book.entries[Number(newest.slice(newest.lastIndexOf("#") + 1))];
 			const tried = clip(`rerun of ${command}`, 80);
 			// A failure recorded before 2.4 has no key line; its last line gets the same filter.
 			const found = clip(String(failed.key ?? keyLine(String(failed.last ?? ""))) || "failed with no output");
