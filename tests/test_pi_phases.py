@@ -1,8 +1,9 @@
 """The phase machine over the loop book: sequences per kind, completion from evidence, regression, skip and back, the read phase, reflect."""
 
+import subprocess
 import unittest
 
-from tests.pi_harness import bash_result, stage, todo_create, tool_result
+from tests.pi_harness import bash_result, stage, todo_create, tool_call, tool_result
 from tests.test_pi_book import BookCase, answers, edit, subagent_result, text_of
 
 DIR = "docs/specs/2026-10-29-x"
@@ -321,6 +322,66 @@ class TestReclassify(PhaseCase):
         (self.cwd / "src/a.py").unlink()
         self.replay([{"file": "README.md", "text": "x\n"}, bash_result("pytest -q", 0, "ok")])
         self.assertEqual(self.entries("verify")[-1]["reach"]["crossed"], [])
+
+
+class TestReachEdges(PhaseCase):
+    """Review round 1 (R-F001..R-F007): what the reach counts and how its line reads."""
+
+    def reach(self) -> dict:
+        return self.entries("verify")[-1]["reach"]
+
+    def test_files_dirty_before_the_loop_count_only_once_the_loop_changes_them(self):
+        self.git_repo()
+        (self.cwd / "app.py").write_text("print(2)\n")
+        for name in ("notes", ".cache/conf", "lib/old.py"):
+            (self.cwd / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.cwd / name).write_text("before\n")
+        self.replay([*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["src/a.py"])
+        self.replay([{"file": "lib/old.py", "text": "changed in the loop\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["lib/old.py", "src/a.py"])
+
+    def test_a_second_repo_keeps_each_repos_directories_as_modules(self):
+        self.git_repo()
+        other = self.cwd / "vendor-repo"
+        other.mkdir()
+        for args in (["init", "-q"], ["config", "user.email", "t@example.com"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(other), *args], check=True, capture_output=True)
+        (other / "x.txt").write_text("x\n")
+        subprocess.run(["git", "-C", str(other), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(other), "commit", "-qm", "base"], check=True, capture_output=True)
+        (self.cwd / ".gitignore").write_text("vendor-repo/\n")
+        steps = [*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, {"file": "lib/b.py", "text": "b\n"}, edit("src/a.py"),
+                 tool_call("edit", str(other / "x.txt")), {"file": "vendor-repo/x.txt", "text": "y\n"}, edit(str(other / "x.txt")), bash_result("pytest -q", 0, "ok")]
+        self.replay(steps)
+        self.assertEqual(len(self.entries("base")), 2)
+        self.assertEqual(self.reach()["crossed"], ["modules"])
+        self.assertEqual(len(self.reach()["modules"]), 2)
+
+    def test_scratch_and_spec_readmes_and_source_named_readme_are_not_behavior_files(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("src/readme_render.py", "scratch/README.md", f"{DIR}/README.md")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("src/readme_render.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual((self.reach()["source"], self.reach()["behavior"]), (["src/readme_render.py"], []))
+
+    def test_root_files_count_as_files_but_not_as_a_module_and_more_lockfiles_and_fixtures_are_skipped(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("package.json", "pi/book.ts", "flake.lock", "tests/fixtures/a.json", "testdata/b.json", "conftest.py")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("pi/book.ts"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach(), {"source": ["package.json", "pi/book.ts"], "modules": ["pi"], "behavior": [], "crossed": []})
+
+    def test_the_line_keeps_the_bash_structured_content(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"},
+                           edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(out["results"][-1].get("structuredContent"), {"exit_code": 0, "output": "ok"})
+
+    def test_an_undeclared_loop_is_told_to_declare_its_kind(self):
+        self.git_repo()
+        stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest -q"}]}}}
+        out = self.replay([todo_create(), stated, tool_call("write", "src/a.py"), {"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"},
+                           edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertIn("declare `kind` with `intent` and `reason`", text_of(out["results"][-1]))
 
 if __name__ == "__main__":
     unittest.main()

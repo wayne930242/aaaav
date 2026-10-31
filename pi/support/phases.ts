@@ -17,6 +17,7 @@ import {
 	anchorCommand,
 	artifactOnDisk,
 	bases,
+	contentHashes,
 	currentKind,
 	diffAgainstBases,
 	lastActIndex,
@@ -99,29 +100,52 @@ export const REVIEWLESS: ReadonlySet<string> = new Set(["quick", "inline"]);
 const REACH_FILES = 3;
 const REACH_MODULES = 2;
 
-const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|specs?)\/|\.(?:test|spec)\.[^/]+$|(?:^|\/)test_[^/]+\.py$|_test\.(?:py|go)$/i;
-const LOCKFILE = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|uv\.lock|poetry\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/;
+// `spec/` and `specs/` count as tests, the RSpec and Jasmine layout; a durable spec folder is outside work anyway.
+const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|testdata|fixtures|specs?)\/|\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:test_[^/]+|conftest)\.py$|_test\.(?:py|go)$/i;
+const LOCKFILE =
+	/(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|uv\.lock|poetry\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock|flake\.lock|pubspec\.lock|mix\.lock|packages\.lock\.json|Package\.resolved)$/;
 /** Files that describe behavior to its users: a change to one beside source code changes what users were told. */
-const BEHAVIOR = /(?:^|\/)(?:README[^/]*|CHANGELOG[^/]*|\.changelog\/[^/]+|[^/]+\.schema\.json)$/i;
+const BEHAVIOR = /(?:^|\/)(?:(?:README|CHANGELOG)(?:\.[a-z0-9]+)?|\.changelog\/[^/]+|[^/]+\.schema\.json)$/i;
+
+/** Each path of the diff with its repo and repo-relative POSIX name, leaving out work outside the loop's code and paths still as the loop found them. */
+function loopPaths(entries: Entry[], cwd: string): { repo: string; rel: string }[] {
+	const repos = bases(entries).map((base) => base.repo);
+	const found = new Map<string, Record<string, string>>();
+	for (const entry of entries) if (entry.stage === "base" && entry.dirty && typeof entry.dirty === "object") found.set(String(entry.repo), entry.dirty as Record<string, string>);
+	const paths = diffAgainstBases(entries)
+		.paths.filter((path) => !outsideWork(path, cwd))
+		.map((path) => {
+			const repo = repos.find((root) => within(root, path)) ?? cwd;
+			return { repo, rel: relative(repo, path).split("\\").join("/") };
+		});
+	const unchanged = new Set<string>();
+	for (const repo of repos) {
+		const dirty = found.get(repo) ?? {};
+		const names = paths.filter((path) => path.repo === repo && path.rel in dirty).map((path) => path.rel);
+		const now = names.length ? contentHashes(repo, names) : {};
+		for (const name of names) if (now[name] === dirty[name]) unchanged.add(`${repo}\0${name}`);
+	}
+	return paths.filter((path) => !unchanged.has(`${path.repo}\0${path.rel}`));
+}
 
 /**
  * The reach of the loop's diff against its bases: source files (not tests, lockfiles, behavior files, or what `exempt`
- * names), the top-level directories they sit in, and the behavior files changed beside them. `crossed` names each
- * threshold passed: `files` at three source files, `modules` at two directories, `behavior` at one behavior file.
+ * names), the top-level directories they sit in, and the behavior files changed beside them. Paths already dirty when
+ * a base was recorded count once their content changes. A file at a repository root counts as a file, not a module.
+ * `crossed` names each threshold passed: `files` at three source files, `modules` at two directories, `behavior` at one
+ * behavior file.
  */
 export function reachOf(entries: Entry[], cwd: string): Reach {
-	const repos = bases(entries).map((base) => base.repo);
+	const several = bases(entries).length > 1;
 	const source: string[] = [];
 	const behavior: string[] = [];
 	const modules = new Set<string>();
-	for (const path of diffAgainstBases(entries).paths) {
-		const repo = repos.find((root) => within(root, path)) ?? cwd;
-		const rel = relative(repo, path).split("\\").join("/");
-		const shown = repos.length > 1 ? `${basename(repo)}/${rel}` : rel;
+	for (const { repo, rel } of loopPaths(entries, cwd)) {
+		const shown = several ? `${basename(repo)}/${rel}` : rel;
 		if (BEHAVIOR.test(rel)) behavior.push(shown);
-		else if (!TEST_PATH.test(rel) && !LOCKFILE.test(rel) && !exempt(path, cwd)) {
+		else if (!TEST_PATH.test(rel) && !LOCKFILE.test(rel) && !exempt(join(repo, rel), cwd)) {
 			source.push(shown);
-			modules.add(shown.includes("/") ? shown.slice(0, shown.indexOf("/")) : ".");
+			if (rel.includes("/")) modules.add(`${several ? `${basename(repo)}/` : ""}${rel.slice(0, rel.indexOf("/"))}`);
 		}
 	}
 	const counted = source.length > 0 ? behavior : [];
@@ -147,12 +171,15 @@ export function unansweredReach(entries: Entry[], reach: Reach | undefined): str
 	return reach.crossed.filter((name) => !answered.has(name));
 }
 
-/** The one line that asks an unreviewed loop to re-classify. */
-export function reachLine(reach: Reach, kind: string): string {
+/** The one line that asks an unreviewed loop to re-classify; an undeclared loop is asked to declare its kind. */
+export function reachLine(reach: Reach, kind: string | undefined): string {
 	const files = `${reach.source.length} source file${reach.source.length === 1 ? "" : "s"}`;
 	const modules = `${reach.modules.length} module${reach.modules.length === 1 ? "" : "s"} (${reach.modules.slice(0, 4).join(", ")}${reach.modules.length > 4 ? ", …" : ""})`;
 	const told = reach.behavior.length ? ` and changes ${reach.behavior.slice(0, 3).join(", ")}${reach.behavior.length > 3 ? ", …" : ""}` : "";
-	return `the change reaches ${files} across ${modules}${told}; call \`kind\` with \`reason\`: upgrade to reviewed, or say why ${kind} still fits`;
+	const ask = kind
+		? `call \`kind\` with \`reason\`: upgrade to reviewed, or say why ${kind} still fits`
+		: "declare `kind` with `intent` and `reason`: reviewed when it reaches past its files, or inline and why it still fits";
+	return `the change reaches ${files} across ${modules}${told}; ${ask}`;
 }
 
 // --- evidence ------------------------------------------------------------------------------------
@@ -275,7 +302,7 @@ function evaluate(name: string, ctx: Ctx): Status {
 			if (entry.declared !== true && entry.exit !== 0) return missing(name, `the anchor exited ${entry.exit ?? "unknown"} after the last change`);
 			if (ctx.seq.includes("decide") && !artifact(ctx, "verification", from)) return missing(name, `${ctx.folder ?? "docs/specs/<folder>"}/verification.md (a durable loop's verify also needs it)`);
 			const reach = entry.reach as Reach | undefined;
-			if (unansweredReach(entries, reach).length > 0) return missing(name, reachLine(reach as Reach, currentKind(entries) ?? "inline"));
+			if (unansweredReach(entries, reach).length > 0) return missing(name, reachLine(reach as Reach, currentKind(entries)));
 			return done(name, entry.declared === true ? "declared" : "");
 		}
 		case "review": {

@@ -579,12 +579,31 @@ export function bases(entries: Entry[]): { repo: string; head: string }[] {
 	return entries.filter((entry) => entry.stage === "base").map((entry) => ({ repo: String(entry.repo), head: String(entry.head) }));
 }
 
-/** Adds the repo of `path` to the book with its HEAD when the book has no base for it yet. */
+/** The content hash of each of `names` in `repo`, `deleted` for a path that is gone. */
+export function contentHashes(repo: string, names: string[]): Record<string, string> {
+	const found: Record<string, string> = {};
+	const present = names.filter((name) => existsSync(join(repo, name)));
+	for (const name of names) if (!present.includes(name)) found[name] = "deleted";
+	const hashes = present.length ? (git(repo, ["hash-object", "--", ...present])?.split("\n") ?? []) : [];
+	present.forEach((name, index) => {
+		found[name] = hashes[index] ?? "unknown";
+	});
+	return found;
+}
+
+/** The paths already changed or untracked in `repo` against `head`, with their content hashes: work the loop found, not made. */
+function dirtyAt(repo: string, head: string): Record<string, string> {
+	const changed = git(repo, ["diff", "--name-only", head])?.split("\n") ?? [];
+	const untracked = git(repo, ["ls-files", "--others", "--exclude-standard"])?.split("\n") ?? [];
+	return contentHashes(repo, [...new Set([...changed, ...untracked].filter(Boolean))].slice(0, 500));
+}
+
+/** Adds the repo of `path` to the book with its HEAD, and the paths already dirty there, when the book has no base for it yet. */
 export function touchRepo(book: Book, path: string): boolean {
 	const found = repoOf(path);
 	if (!found) return false;
 	if (bases(book.entries).some((base) => base.repo === found.repo)) return false;
-	const entry = appendEntry(book.path, "base", found);
+	const entry = appendEntry(book.path, "base", { ...found, dirty: dirtyAt(found.repo, found.head) });
 	book.entries.push(entry);
 	return true;
 }

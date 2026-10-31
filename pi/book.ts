@@ -436,7 +436,7 @@ export default function (pi: ExtensionAPI) {
 		description:
 			"Declare only what the extension cannot observe in the anchorloop loop book. " +
 			"`kind` (kind, intent, optional anchor command; call again to set the anchor, or with `reason` to change the kind or answer a re-classification): quick (act, check), inline (anchor, act, verify), reviewed (adds review), durable (adds decide, grill, spec, read, approve, design); every kind ends with reflect, close. " +
-			"When an anchor run of a quick or inline loop finds the change reaching 3 source files, 2 modules, or a README or changelog beside code, its verify waits for a `kind` call with `reason`. " +
+			"When an anchor run or declared verify of a quick or inline loop finds the change reaching 3 source files, 2 modules, or a README, changelog, or *.schema.json beside code, its verify waits for a `kind` call with `reason`. " +
 			"`verify` (note; only for an anchor that is not a command), `fresh-read` (a fresh-context read of the spec is done), `friction` (tried, found, led_by), `reflect` (friction ids, class misdirection|gap|resolved, action), " +
 			"`skip` / `back` (phase, reason), `close` (verdict), `read` (view the book). Edits, anchor runs, reviews, and spec files are read from evidence. " +
 			"A loop opens with the first `todo` create; `close` refuses while a pending or in-progress todo lacks metadata.followup.",
@@ -575,7 +575,7 @@ export default function (pi: ExtensionAPI) {
 	/** The line that asks the loop to re-classify after a verify or check entry whose reach no `kind` answer covers. */
 	function reachNotice(book: Book, entry: Entry): string | undefined {
 		const reach = entry.reach as ReturnType<typeof reachOf> | undefined;
-		return reach && unansweredReach(book.entries, reach).length > 0 ? `anchorloop: ${reachLine(reach, currentKind(book.entries) ?? "inline")}.` : undefined;
+		return reach && unansweredReach(book.entries, reach).length > 0 ? `anchorloop: ${reachLine(reach, currentKind(book.entries))}.` : undefined;
 	}
 
 	/**
@@ -617,7 +617,8 @@ export default function (pi: ExtensionAPI) {
 			if (event.toolName === "bash") {
 				const book = openLoop(ctx);
 				const notice = book ? recordBash(book, event, ctx.cwd) : undefined;
-				return notice ? { content: [...((event.content as unknown[]) ?? []), { type: "text", text: notice }] } : undefined;
+				// The line only appends text, so the bash call's structured output passes on unchanged.
+				return notice ? { content: [...((event.content as unknown[]) ?? []), { type: "text", text: notice }], structuredContent: event.structuredContent } : undefined;
 			}
 			if (event.isError) return;
 			if (event.toolName === "todo") {
