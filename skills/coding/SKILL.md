@@ -19,7 +19,7 @@ Re-classify when the reach changes: the user adds scope, an anchor run reports t
 
 ## Anchor
 
-Point the anchor at what the change touches: a one-line edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests and the repository's tree-wide checks, such as lint, config sweeps, ratchets, and changelog checks. For Inline work, a green anchor plus a read of your own diff completes Verify; report the contract with its observed output in one line. Reviewed work adds an independent review whose brief carries the premises and asks the reviewer to test each premise against the code, to sweep each finding's class across the change, and to confirm the tree-wide checks ran. Durable work verifies into `verification.md` as MINI-SDD describes.
+Point the anchor at what the change touches: a one-line edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests and the repository's tree-wide checks, such as lint, config sweeps, ratchets, and changelog checks. When one change carries several fixes, give each fix a test case that only it turns green, and check that reverting that fix alone turns the case red: a case two fixes both satisfy stays green when either is reverted. For Inline work, a green anchor plus a read of your own diff completes Verify; report the contract with its observed output in one line. Reviewed work adds an independent review whose brief carries the premises and asks the reviewer to test each premise against the code, to sweep each finding's class across the change, and to confirm the tree-wide checks ran. Durable work verifies into `verification.md` as MINI-SDD describes.
 
 ## Playbooks
 
