@@ -23,7 +23,6 @@ import {
 	lastActIndex,
 	lastIndex,
 	repoRootOf,
-	retryWithoutFriction,
 	specFolder,
 	withChildActs,
 } from "./book.ts";
@@ -47,8 +46,6 @@ export type Phases = {
 	missing: string;
 	skipped: string[];
 	backs: string[];
-	/** Advisory hints that are not phases. */
-	hints: string[];
 };
 
 export type Inputs = { entries: Entry[]; cwd: string; todos: Task[]; env?: NodeJS.ProcessEnv };
@@ -347,7 +344,6 @@ export function computePhases(book: Pick<Book, "entries">, inputs: Omit<Inputs, 
 	if (next === "fix") note = first?.note ?? "";
 	const skipped = statuses.filter((status) => status.state === "skipped" && status.note !== "no friction").map((status) => `${status.name} (${status.note})`);
 	const backs = book.entries.filter((entry) => entry.stage === "back").map((entry) => `${entry.phase} (${entry.reason})`);
-	const hints = retryWithoutFriction(book.entries) ? ["friction: a failed run was retried and passed, with no friction entry after it"] : [];
 	return {
 		kind: kind ?? "undeclared",
 		statuses,
@@ -356,7 +352,6 @@ export function computePhases(book: Pick<Book, "entries">, inputs: Omit<Inputs, 
 		missing: note,
 		skipped,
 		backs,
-		hints,
 	};
 }
 

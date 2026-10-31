@@ -25,8 +25,6 @@ export type Snapshot = {
 	/** The program's next phase and what it lacks, in a few words. */
 	next: string;
 	missing: string;
-	/** Advisory hints that are not phases, such as an unrecorded friction. */
-	hints: string[];
 	/** The last phase the book shows complete. */
 	current: string;
 	/** A review recorded after the last change with no blocking finding on it. */
@@ -64,7 +62,6 @@ export function snapshot(book: Book, ctx: { cwd: string; sessionManager: { getBr
 		},
 		next: phases.next,
 		missing: phases.missing,
-		hints: phases.hints,
 		current: phases.current,
 		reviewClear: reviewClearAfterLastAct(entries),
 	};

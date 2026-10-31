@@ -392,21 +392,17 @@ class TestFriction(BookCase):
         (reflect,) = self.entries("reflect")
         self.assertEqual((reflect["friction"], reflect["class"], reflect["action"]), (["1"], "gap", "solid-loop"))
 
-    def test_a_failed_anchor_run_followed_by_a_pass_is_a_retry_pair_that_asks_for_a_friction_note(self):
+    def test_a_failed_anchor_run_followed_by_a_pass_records_its_own_friction(self):
         steps = [*self.open_loop(anchor="pytest"), edit(), bash_result("pytest", 0, "ok"), edit(), bash_result("pytest", 1, "1 failed"), edit(), bash_result("pytest", 0, "ok")]
-        self.assertIn("friction: a failed run was retried and passed", self.read_text(steps))
+        self.assertIn("friction: 1 (1 unreflected)", self.read_text(steps))
 
     def test_red_first_failures_before_any_pass_are_not_retries(self):
         steps = [*self.open_loop(anchor="pytest"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 0, "ok")]
-        self.assertNotIn("retried and passed", self.read_text(steps))
-
-    def test_a_friction_entry_after_the_retry_clears_the_hint(self):
-        steps = [*self.open_loop(anchor="pytest"), bash_result("pytest", 0, "ok"), bash_result("pytest", 1, "1 failed"), bash_result("pytest", 0, "ok"), stage(stage="friction", tried="a", found="b")]
-        self.assertNotIn("retried and passed", self.read_text(steps))
+        self.assertIn("friction: 0 (0 unreflected)", self.read_text(steps))
 
     def test_a_task_anchor_run_counts_for_retry_pairs(self):
         steps = [todo_create("t", anchor="pytest -q x"), stage(stage="kind", kind="inline", intent="x"), bash_result("pytest -q x", 0, "ok"), bash_result("pytest -q x", 1, "bad"), bash_result("pytest -q x", 0, "ok")]
-        self.assertIn("retried and passed", self.read_text(steps))
+        self.assertIn("friction: 1 (1 unreflected)", self.read_text(steps))
 
     def test_close_never_refuses_over_friction_carries_it_into_the_session_entry_and_lists_the_unreflected(self):
         out = self.replay([*self.open_loop(), stage(stage="friction", tried="a", found="b", led_by="skill X"), stage(stage="friction", tried="c", found="d"),

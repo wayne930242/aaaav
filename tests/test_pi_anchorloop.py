@@ -329,9 +329,9 @@ class TestSecondThought(ExtensionCase):
         out = self.settle_after(answers(review="full"), edit_result(), kind="reviewed")
         self.assertIn("needs full independent review", self.content(out))
 
-    def test_a_retry_pair_without_friction_adds_the_friction_hint(self):
+    def test_a_retry_pair_leaves_its_recorded_friction_for_the_reflect(self):
         out = self.settle_after(answers(), edit_result(), bash_result("pytest -q", 0, "ok"), bash_result("pytest -q", 1, "bad"), bash_result("pytest -q", 0, "ok"))
-        self.assertIn("friction: a failed run was retried and passed, with no friction entry after it", self.content(out))
+        self.assertIn("next → reflect (missing: 1 friction entry without a reflect)", self.content(out))
 
     def test_low_completion_done_and_quality_are_listed_as_concerns(self):
         out = self.settle_after(answers("advance", done=0.05, quality=0.5), edit_result(), bash_result("pytest -q", 0, "ok"))

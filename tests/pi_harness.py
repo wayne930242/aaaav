@@ -31,7 +31,7 @@ const [extensionUrls, cwd, stepsJson, branchJson, classifyJson, sessionId, sessi
 const handlers = {};
 const tools = {};
 const branch = JSON.parse(branchJson);
-const out = { results: [], classifyCalls: [], questionSets: [], notices: [], appended: [], emitted: [] };
+const out = { results: [], classifyCalls: [], questionSets: [], notices: [], appended: [], emitted: [], statuses: [] };
 const pi = {
   on: (event, fn) => { (handlers[event] ??= []).push(fn); },
   registerTool: (tool) => { tools[tool.name] = tool; },
@@ -44,7 +44,10 @@ for (const url of JSON.parse(extensionUrls)) {
 const classifyPlan = JSON.parse(classifyJson);
 const ctx = {
   cwd,
-  ui: { notify: (message, level) => out.notices.push({ step: out.results.length, message, level }) },
+  ui: {
+    notify: (message, level) => out.notices.push({ step: out.results.length, message, level }),
+    setStatus: (key, text) => out.statuses.push({ step: out.results.length, key, text: text ?? null }),
+  },
   sessionManager: { getBranch: () => branch, getSessionId: () => sessionId, getSessionFile: () => sessionFile || undefined },
   modelRegistry: {
     findOfType: (...args) => {

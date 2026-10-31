@@ -29,7 +29,7 @@ The reply names a [principle](PRINCIPLES.md) only with the decision it changed.
 
 ### Friction Notes
 
-Each time an attempt fails and a later attempt reveals why, record it with `anchorloop_stage friction` before continuing.
+Each time an attempt fails and a later attempt reveals why, record it with `anchorloop_stage friction` before continuing. An anchor that passed, failed, and passed again is recorded by the extension; reflect on that entry like any other.
 
 ### Decision Trail
 

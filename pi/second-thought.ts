@@ -106,7 +106,7 @@ export function continues(verdict: Verdict, snap: Snapshot): boolean {
 
 /** One line: the program's next phase and its gap, Jev's move and scores, and, away from close, the call to act. */
 export function message(verdict: Verdict, snap: Snapshot, found: string[], notes: string[], atClose = false): string {
-	const extra = [...found, ...notes, ...snap.hints];
+	const extra = [...found, ...notes];
 	return (
 		`Second thought (Jev, advisory): next → ${snap.next}${snap.missing ? ` (missing: ${snap.missing})` : ""}; ` +
 		`${verdict.move}; done ${verdict.done.toFixed(2)}, review ${verdict.review}, quality ${verdict.quality.toFixed(2)}/3` +
