@@ -261,5 +261,66 @@ class TestCloseAndReflect(PhaseCase):
         self.assertIn("skipped: reflect (resolved in the change)", self.line([stage(stage="skip", phase="reflect", reason="resolved in the change")]))
 
 
+
+class TestReclassify(PhaseCase):
+    def wide(self) -> list[dict]:
+        """Three source files in two modules, the reach that asks an unreviewed loop to re-classify."""
+        return [{"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"}, edit("src/a.py")]
+
+    def test_changing_the_kind_needs_a_reason(self):
+        out = self.replay([*self.open_loop("inline"), stage(stage="kind", kind="reviewed"), stage(stage="kind", kind="reviewed", reason="the reader moved to 9 callers")])
+        self.assertIn("needs `reason`", out["results"][2]["error"])
+        self.assertIn("kind changed: inline → reviewed (the reader moved to 9 callers)", text_of(out["results"][3]))
+        self.assertEqual(self.entries("kind")[-1]["reason"], "the reader moved to 9 callers")
+
+    def test_a_reason_lets_the_kind_drop(self):
+        out = self.replay([*self.open_loop("reviewed", anchor="pytest"), edit(), bash_result("pytest", 0, "ok"), subagent_result("reviewer", "r1", "Blocking: P0=0 P1=0"),
+                           stage(stage="kind", kind="inline", reason="one file after all")])
+        self.assertIn("kind changed: reviewed → inline (one file after all)", text_of(out["results"][-1]))
+
+    def test_an_anchor_run_past_the_reach_asks_an_inline_loop_to_reclassify_until_kind_answers(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok")])
+        notice = text_of(out["results"][-1]).splitlines()[-1]
+        self.assertTrue(notice.startswith("anchorloop: the change reaches 3 source files across 2 modules (lib, src);"), notice)
+        self.assertIn("`kind` with `reason`", notice)
+        self.assertIn("→ verify (missing: the change reaches 3 source files across 2 modules (lib, src)", self.line([]))
+        self.assertEqual(self.line([stage(stage="kind", kind="inline", reason="three one-line renames")]), "inline · phase verify ✓ → close")
+        self.assertEqual(self.entries("kind")[-1]["crossed"], ["files", "modules"])
+
+    def test_upgrading_answers_the_reach_and_a_reviewed_loop_is_never_asked(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop("reviewed", anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok")])
+        self.assertIsNone(out["results"][-1])
+        self.assertIn("phase verify ✓ → review", self.line([]))
+
+    def test_a_criterion_the_answer_did_not_cover_asks_again(self):
+        self.git_repo()
+        self.replay([*self.open_loop(anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok"), stage(stage="kind", kind="inline", reason="renames")])
+        out = self.replay([{"file": "README.md", "text": "a new flag\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertIn("and changes README.md", text_of(out["results"][-1]))
+        self.assertIn("→ verify (missing: the change reaches", self.line([]))
+
+    def test_a_quick_loop_is_asked_at_its_check(self):
+        self.git_repo()
+        self.replay([*self.open_loop("quick", anchor="make lint"), *self.wide(), bash_result("make lint", 0, "ok")])
+        self.assertIn("quick · phase act ✓ → check (missing: the change reaches 3 source files", self.line([]))
+
+    def test_a_declared_verify_measures_the_reach_too(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="the page shows the column"), *self.wide(), stage(stage="verify", note="the column is there")])
+        self.assertIn("anchorloop: the change reaches 3 source files", text_of(out["results"][-1]))
+        self.assertIn("→ verify (missing: the change reaches 3 source files", self.line([]))
+
+    def test_tests_lockfiles_specs_and_a_readme_without_source_do_not_count(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("src/a.py", "tests/test_a.py", "src/a.test.ts", "pkg/b_test.go", "uv.lock", f"{DIR}/spec.md")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.entries("verify")[-1]["reach"], {"source": ["src/a.py"], "modules": ["src"], "behavior": [], "crossed": []})
+        self.assertEqual(self.line([]), "inline · phase verify ✓ → close")
+        (self.cwd / "src/a.py").unlink()
+        self.replay([{"file": "README.md", "text": "x\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.entries("verify")[-1]["reach"]["crossed"], [])
+
 if __name__ == "__main__":
     unittest.main()

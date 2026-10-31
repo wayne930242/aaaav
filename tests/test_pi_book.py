@@ -89,7 +89,7 @@ class TestLifecycle(BookCase):
         self.assertEqual(self.book_files(), [])
 
     def test_a_second_kind_declaration_upgrades_the_open_loop(self):
-        out = self.replay([*self.open_loop("inline"), stage(stage="kind", kind="reviewed"), stage(stage="read")])
+        out = self.replay([*self.open_loop("inline"), stage(stage="kind", kind="reviewed", reason="the fix reaches a shared reader"), stage(stage="read")])
         self.assertEqual(len(self.book_files()), 1)
         self.assertIn("kind changed: inline → reviewed", text_of(out["results"][2]))
         self.assertTrue(text_of(out["results"][3]).startswith("reviewed · phase start → anchor"))
