@@ -46,6 +46,42 @@ class TestAutoFriction(BookCase):
         self.rerun('boom happened\n  File "lib/error_utils.py", line 3, in run\n    at handleError (lib/x.js:1:1)')
         self.assertEqual(self.entries("friction")[0]["found"], "boom happened")
 
+    def test_a_python_exception_line_beats_the_code_inside_its_traceback(self):
+        self.rerun('Traceback (most recent call last):\n  File "x.py", line 3, in <module>\n    log.error("bad")\nValueError: boom')
+        self.assertEqual(self.entries("friction")[0]["found"], "ValueError: boom")
+
+    def test_an_exception_name_is_a_key_line(self):
+        self.rerun("ValueError: boom\nexit status 1")
+        self.assertEqual(self.entries("friction")[0]["found"], "ValueError: boom")
+
+    def test_the_source_a_python_frame_quotes_is_not_a_key_line(self):
+        self.rerun('  File "x.py", line 3, in run\n    log.error("bad")\nboom')
+        self.assertEqual(self.entries("friction")[0]["found"], "boom")
+
+    def test_each_anchor_regression_gets_its_own_entry(self):
+        task = {"id": 1, "subject": "write the fix", "status": "in_progress", "metadata": {"anchor": "npm test"}}
+        update = tool_result("todo", {"action": "update", "id": 1, "status": "in_progress"}, "updated", details={"tasks": [task], "nextId": 2})
+        self.replay([*self.open_loop(anchor="pytest -q"), update, edit(), bash_result("pytest -q", 0, "ok"), bash_result("npm test", 0, "ok"),
+                     bash_result("npm test", 1, "Error: npm broke"), bash_result("pytest -q", 1, "E   assert 1 == 2"), bash_result("pytest -q", 0, "ok"),
+                     bash_result("npm test", 0, "ok")])
+        self.assertEqual(sorted(entry["found"] for entry in self.entries("friction")), ["E   assert 1 == 2", "Error: npm broke"])
+
+    def test_one_run_of_an_anchor_shared_by_loop_and_task_is_one_entry(self):
+        task = {"id": 1, "subject": "write the fix", "status": "in_progress", "metadata": {"anchor": "pytest -q"}}
+        update = tool_result("todo", {"action": "update", "id": 1, "status": "in_progress"}, "updated", details={"tasks": [task], "nextId": 2})
+        self.replay([*self.open_loop(anchor="pytest -q"), update, edit(), bash_result("pytest -q", 0, "ok"), bash_result("pytest -q", 1, "E   x"),
+                     bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(len(self.entries("friction")), 1)
+
+    def test_a_failure_recorded_before_the_key_line_existed_still_gives_a_key_line(self):
+        self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok")])
+        book = self.book_files()[0]
+        old = {"stage": "verify", "command": "pytest -q", "exit": 1, "last": '  File "x.py", line 3, in run'}
+        text = book.read_text()
+        book.write_text(text + ("  - " if "\n  - " in text else "- ") + __import__("json").dumps(old) + "\n")
+        self.replay([bash_result("pytest -q", 0, "ok")])
+        self.assertEqual([entry["found"] for entry in self.entries("friction")], ["failed with no output"])
+
     def test_without_an_error_line_the_last_line_is_kept(self):
         self.rerun("compiling\n3 checks did not pass")
         self.assertIn("3 checks did not pass", self.entries("friction")[0]["found"])

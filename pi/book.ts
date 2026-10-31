@@ -107,15 +107,23 @@ function clip(text: string, limit = 120): string {
 const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g;
 // Stack frames and traceback headers say where, not what; the key line says what failed.
 const FRAME = /^(?:at\s|File\s"|Traceback\b|\^+$)/;
-const KEY_LINES = [/^(?:FAILED|ERROR)\b/, /^E\s+\S/, /\b(?:error|fatal|panic|exception)\b/i, /\bfail(?:ed|ure|s)?\b/i];
+const KEY_LINES = [
+	/^(?:FAILED|ERROR)\b/,
+	/^E\s+\S/,
+	/^[\w.]+(?:Error|Exception|Warning)\b:?/,
+	/\b(?:error|fatal|panic|exception)\b/i,
+	/\bfail(?:ed|ure|s)?\b/i,
+];
 
 /** The one line of a failed run's output that says what failed, at most 120 characters; the last line when none does. */
 function keyLine(text: string): string {
-	const lines = text
-		.replace(ANSI, "")
-		.split("\n")
-		.map((line) => line.trim())
-		.filter((line) => line && !FRAME.test(line));
+	const raw = text.replace(ANSI, "").split("\n");
+	// A Python frame's next line, indented under it, is the source it quotes, not the failure.
+	const quoted = (index: number) => /^\s/.test(raw[index]) && /^\s*File\s"/.test(raw[index - 1] ?? "");
+	const lines = raw.flatMap((line, index) => {
+		const trimmed = line.trim();
+		return trimmed && !FRAME.test(trimmed) && !quoted(index) ? [trimmed] : [];
+	});
 	for (const pattern of KEY_LINES) {
 		const hit = lines.find((line) => pattern.test(line));
 		if (hit) return clip(hit);
@@ -654,19 +662,31 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	/**
-	 * Records one friction line for each anchor that passed again after it had passed and then failed, unless a friction
-	 * entry already follows the failure. Returns the lines that tell the agent.
+	 * Records one friction line for each anchor that passed again after it had passed and then failed. A pair is recorded
+	 * once, and not at all when the agent recorded a friction entry itself after the failure. The pairs one command
+	 * completes in one bash call (it is both the loop and a task anchor) share one entry. Returns the lines that tell the agent.
 	 */
 	function autoFriction(book: Book): string[] {
 		const lines: string[] = [];
+		const open = new Map<string, string[]>();
 		for (const pair of retryPairs(book.entries)) {
-			if (book.entries.some((entry, index) => index > pair.fail && entry.stage === "friction")) continue;
-			const failed = book.entries[pair.fail];
-			const tried = clip(`rerun of ${String(failed.command ?? pair.key)}`, 80);
-			const found = clip(String(failed.key ?? failed.last ?? "") || "failed with no output");
-			const id = frictionOf(book.entries).length + 1;
-			book.entries.push(appendEntry(book.path, "friction", { id, tried, found, led_by: "none", auto: true }));
-			lines.push(`anchorloop: friction #${id} recorded from the ${tried}: ${found}. Classify it with \`reflect\` before close.`);
+			const id = `${pair.key}#${pair.fail}`;
+			const recorded = book.entries.some(
+				(entry, index) =>
+					entry.stage === "friction" && ((Array.isArray(entry.pairs) && entry.pairs.includes(id)) || (index > pair.fail && entry.auto !== true)),
+			);
+			if (recorded) continue;
+			const command = String(book.entries[pair.fail].command ?? pair.key);
+			open.set(command, [...(open.get(command) ?? []), id]);
+		}
+		for (const [command, pairs] of open) {
+			const failed = book.entries[Number(pairs[0].slice(pairs[0].lastIndexOf("#") + 1))];
+			const tried = clip(`rerun of ${command}`, 80);
+			// A failure recorded before 2.4 has no key line; its last line gets the same filter.
+			const found = clip(String(failed.key ?? keyLine(String(failed.last ?? ""))) || "failed with no output");
+			const number = frictionOf(book.entries).length + 1;
+			book.entries.push(appendEntry(book.path, "friction", { id: number, tried, found, led_by: "none", auto: true, pairs }));
+			lines.push(`anchorloop: friction #${number} recorded from the ${tried}: ${found}. Classify it with \`reflect\` before close.`);
 		}
 		return lines;
 	}
