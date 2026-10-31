@@ -123,7 +123,8 @@ function loopPaths(entries: Entry[], cwd: string): { repo: string; rel: string }
 		const dirty = found.get(repo) ?? {};
 		const names = paths.filter((path) => path.repo === repo && path.rel in dirty).map((path) => path.rel);
 		const now = names.length ? contentHashes(repo, names) : {};
-		for (const name of names) if (now[name] === dirty[name]) unchanged.add(`${repo}\0${name}`);
+		// An `unknown` hash proves nothing, so that path counts.
+		for (const name of names) if (dirty[name] !== "unknown" && now[name] === dirty[name]) unchanged.add(`${repo}\0${name}`);
 	}
 	return paths.filter((path) => !unchanged.has(`${path.repo}\0${path.rel}`));
 }

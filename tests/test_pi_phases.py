@@ -341,6 +341,44 @@ class TestReachEdges(PhaseCase):
         self.replay([{"file": "lib/old.py", "text": "changed in the loop\n"}, bash_result("pytest -q", 0, "ok")])
         self.assertEqual(self.reach()["source"], ["lib/old.py", "src/a.py"])
 
+    def test_a_path_git_cannot_hash_hides_no_other_pre_dirty_file(self):
+        self.git_repo()
+        (self.cwd / "lib").mkdir()
+        (self.cwd / "lib/old.py").write_text("before\n")
+        (self.cwd / "lib/keep.py").write_text("before\n")
+        subprocess.run(["git", "-C", str(self.cwd), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.cwd), "commit", "-qm", "lib"], check=True, capture_output=True)
+        (self.cwd / "lib/old.py").write_text("dirty before the loop\n")
+        (self.cwd / "lib/keep.py").write_text("dirty before the loop, never touched\n")
+        (self.cwd / "app.py").unlink()
+        (self.cwd / "app.py").mkdir()
+        (self.cwd / "app.py/inner.txt").write_text("x\n")
+        self.replay([*self.open_loop(anchor="pytest -q"), {"file": "lib/old.py", "text": "changed in the loop\n"}, bash_result("pytest -q", 0, "ok")])
+        # Each other path still hashes alone, and the one git cannot hash counts, since its hash proves nothing.
+        self.assertEqual(self.reach()["source"], ["app.py", "lib/old.py"])
+
+    def test_a_repo_first_reached_by_a_merge_counts_the_merged_files_but_not_its_older_work(self):
+        other = self.cwd / "merged"
+        other.mkdir()
+        git = lambda *args: subprocess.run(["git", "-C", str(other), *args], check=True, capture_output=True)
+        for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@example.com"], ["config", "user.name", "t"]):
+            git(*args)
+        (other / "base.txt").write_text("b\n")
+        git("add", ".")
+        git("commit", "-qm", "base")
+        git("switch", "-qc", "feature")
+        for name in ("src/a.py", "src/b.py", "lib/c.py"):
+            (other / name).parent.mkdir(parents=True, exist_ok=True)
+            (other / name).write_text("x\n")
+        git("add", ".")
+        git("commit", "-qm", "feature")
+        git("switch", "-q", "main")
+        (other / "wip").mkdir()
+        (other / "wip/x.py").write_text("older work\n")
+        git("merge", "-q", "--no-ff", "-m", "merge feature", "feature")
+        self.replay([*self.open_loop(anchor="pytest -q"), bash_result(f"git -C {other} merge feature", 0, "Merge made"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["lib/c.py", "src/a.py", "src/b.py"])
+
     def test_a_second_repo_keeps_each_repos_directories_as_modules(self):
         self.git_repo()
         other = self.cwd / "vendor-repo"

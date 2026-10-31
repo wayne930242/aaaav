@@ -579,14 +579,17 @@ export function bases(entries: Entry[]): { repo: string; head: string }[] {
 	return entries.filter((entry) => entry.stage === "base").map((entry) => ({ repo: String(entry.repo), head: String(entry.head) }));
 }
 
-/** The content hash of each of `names` in `repo`, `deleted` for a path that is gone. */
+/**
+ * The content hash of each of `names` in `repo`, `deleted` for a path that is gone, and `unknown` for one git cannot hash
+ * (a directory or submodule). One such path fails the batch, so the batch falls back to hashing each path alone.
+ */
 export function contentHashes(repo: string, names: string[]): Record<string, string> {
 	const found: Record<string, string> = {};
 	const present = names.filter((name) => existsSync(join(repo, name)));
 	for (const name of names) if (!present.includes(name)) found[name] = "deleted";
-	const hashes = present.length ? (git(repo, ["hash-object", "--", ...present])?.split("\n") ?? []) : [];
+	const batch = present.length ? git(repo, ["hash-object", "--", ...present])?.split("\n") : [];
 	present.forEach((name, index) => {
-		found[name] = hashes[index] ?? "unknown";
+		found[name] = (batch ? batch[index] : git(repo, ["hash-object", "--", name])) || "unknown";
 	});
 	return found;
 }
@@ -621,8 +624,9 @@ export function touchRepoBeforeMerge(book: Book, dir: string, verb: string): boo
 	const first = reflog.findIndex((line) => !ofVerb(line));
 	const before = reflog.length > 0 && ofVerb(reflog[0]) && first > 0 ? reflog[first].slice(0, 40) : undefined;
 	// A rebasing pull leaves the old HEAD off HEAD's history; their merge base keeps the pulled commits in the diff.
+	// The dirty snapshot is the uncommitted work against HEAD, so the merged files stay the loop's change.
 	const base = before === undefined ? undefined : git(found.repo, ["merge-base", before, "HEAD"]);
-	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: base || found.head }));
+	book.entries.push(appendEntry(book.path, "base", { repo: found.repo, head: base || found.head, dirty: dirtyAt(found.repo, found.head) }));
 	return true;
 }
 
