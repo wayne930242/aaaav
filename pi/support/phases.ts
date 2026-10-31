@@ -16,7 +16,10 @@ import {
 	allFriction,
 	anchorCommand,
 	artifactOnDisk,
+	bases,
+	contentHashes,
 	currentKind,
+	diffAgainstBases,
 	lastActIndex,
 	lastIndex,
 	repoRootOf,
@@ -85,6 +88,99 @@ export function outsideWork(filePath: string, cwd: string): boolean {
 /** Markdown, text, and HTML files and everything `outsideWork` names: an edit the anchor gate does not warn about. */
 export function exempt(filePath: string, cwd: string): boolean {
 	return EXEMPT_EXTENSIONS.includes(extname(filePath).toLowerCase()) || outsideWork(filePath, cwd);
+}
+
+// --- reach -----------------------------------------------------------------------------------------
+
+/** What a change reaches, measured from its diff: the count an unreviewed loop is re-classified at, not the author's confidence. */
+export type Reach = { source: string[]; modules: string[]; behavior: string[]; crossed: string[] };
+
+/** The kinds that never run a review; a change past the reach thresholds asks them to re-classify. */
+export const REVIEWLESS: ReadonlySet<string> = new Set(["quick", "inline"]);
+const REACH_FILES = 3;
+const REACH_MODULES = 2;
+
+// `spec/` and `specs/` count as tests, the RSpec and Jasmine layout; a durable spec folder is outside work anyway.
+const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|testdata|fixtures|specs?)\/|\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:test_[^/]+|conftest)\.py$|_test\.(?:py|go)$/i;
+const LOCKFILE =
+	/(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|uv\.lock|poetry\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock|flake\.lock|pubspec\.lock|mix\.lock|packages\.lock\.json|Package\.resolved)$/;
+/** Files that describe behavior to its users: a change to one beside source code changes what users were told. */
+const BEHAVIOR = /(?:^|\/)(?:(?:README|CHANGELOG)(?:\.[a-z0-9]+)?|\.changelog\/[^/]+|[^/]+\.schema\.json)$/i;
+
+/** Each path of the diff with its repo and repo-relative POSIX name, leaving out work outside the loop's code and paths still as the loop found them. */
+function loopPaths(entries: Entry[], cwd: string): { repo: string; rel: string }[] {
+	const repos = bases(entries).map((base) => base.repo);
+	const found = new Map<string, Record<string, string>>();
+	for (const entry of entries) if (entry.stage === "base" && entry.dirty && typeof entry.dirty === "object") found.set(String(entry.repo), entry.dirty as Record<string, string>);
+	const paths = diffAgainstBases(entries)
+		.paths.filter((path) => !outsideWork(path, cwd))
+		.map((path) => {
+			const repo = repos.find((root) => within(root, path)) ?? cwd;
+			return { repo, rel: relative(repo, path).split("\\").join("/") };
+		});
+	const unchanged = new Set<string>();
+	for (const repo of repos) {
+		const dirty = found.get(repo) ?? {};
+		const names = paths.filter((path) => path.repo === repo && path.rel in dirty).map((path) => path.rel);
+		const now = names.length ? contentHashes(repo, names) : {};
+		// An `unknown` hash proves nothing, so that path counts.
+		for (const name of names) if (dirty[name] !== "unknown" && now[name] === dirty[name]) unchanged.add(`${repo}\0${name}`);
+	}
+	return paths.filter((path) => !unchanged.has(`${path.repo}\0${path.rel}`));
+}
+
+/**
+ * The reach of the loop's diff against its bases: source files (not tests, lockfiles, behavior files, or what `exempt`
+ * names), the top-level directories they sit in, and the behavior files changed beside them. Paths already dirty when
+ * a base was recorded count once their content changes. A file at a repository root counts as a file, not a module.
+ * `crossed` names each threshold passed: `files` at three source files, `modules` at two directories, `behavior` at one
+ * behavior file.
+ */
+export function reachOf(entries: Entry[], cwd: string): Reach {
+	const several = bases(entries).length > 1;
+	const source: string[] = [];
+	const behavior: string[] = [];
+	const modules = new Set<string>();
+	for (const { repo, rel } of loopPaths(entries, cwd)) {
+		const shown = several ? `${basename(repo)}/${rel}` : rel;
+		if (BEHAVIOR.test(rel)) behavior.push(shown);
+		else if (!TEST_PATH.test(rel) && !LOCKFILE.test(rel) && !exempt(join(repo, rel), cwd)) {
+			source.push(shown);
+			if (rel.includes("/")) modules.add(`${several ? `${basename(repo)}/` : ""}${rel.slice(0, rel.indexOf("/"))}`);
+		}
+	}
+	const counted = source.length > 0 ? behavior : [];
+	const crossed = [
+		...(source.length >= REACH_FILES ? ["files"] : []),
+		...(modules.size >= REACH_MODULES ? ["modules"] : []),
+		...(counted.length > 0 ? ["behavior"] : []),
+	];
+	return { source: source.sort(), modules: [...modules].sort(), behavior: counted.sort(), crossed };
+}
+
+/** The thresholds a `kind` call with a `reason` has answered so far. */
+function answeredReach(entries: Entry[]): Set<string> {
+	const answered = new Set<string>();
+	for (const entry of entries) if (entry.stage === "kind" && typeof entry.reason === "string" && Array.isArray(entry.crossed)) for (const name of entry.crossed) answered.add(String(name));
+	return answered;
+}
+
+/** The thresholds the reach crossed that no `kind` answer covers yet; empty for a reviewed or durable loop. */
+export function unansweredReach(entries: Entry[], reach: Reach | undefined): string[] {
+	if (!reach || !REVIEWLESS.has(currentKind(entries) ?? "inline")) return [];
+	const answered = answeredReach(entries);
+	return reach.crossed.filter((name) => !answered.has(name));
+}
+
+/** The one line that asks an unreviewed loop to re-classify; an undeclared loop is asked to declare its kind. */
+export function reachLine(reach: Reach, kind: string | undefined): string {
+	const files = `${reach.source.length} source file${reach.source.length === 1 ? "" : "s"}`;
+	const modules = `${reach.modules.length} module${reach.modules.length === 1 ? "" : "s"} (${reach.modules.slice(0, 4).join(", ")}${reach.modules.length > 4 ? ", …" : ""})`;
+	const told = reach.behavior.length ? ` and changes ${reach.behavior.slice(0, 3).join(", ")}${reach.behavior.length > 3 ? ", …" : ""}` : "";
+	const ask = kind
+		? `call \`kind\` with \`reason\`: upgrade to reviewed, or say why ${kind} still fits`
+		: "declare `kind` with `intent` and `reason`: reviewed when it reaches past its files, or inline and why it still fits";
+	return `the change reaches ${files} across ${modules}${told}; ${ask}`;
 }
 
 // --- evidence ------------------------------------------------------------------------------------
@@ -206,6 +302,8 @@ function evaluate(name: string, ctx: Ctx): Status {
 			if (entry.declared === true && entry.result === "fail") return missing(name, "the declared verify failed");
 			if (entry.declared !== true && entry.exit !== 0) return missing(name, `the anchor exited ${entry.exit ?? "unknown"} after the last change`);
 			if (ctx.seq.includes("decide") && !artifact(ctx, "verification", from)) return missing(name, `${ctx.folder ?? "docs/specs/<folder>"}/verification.md (a durable loop's verify also needs it)`);
+			const reach = entry.reach as Reach | undefined;
+			if (unansweredReach(entries, reach).length > 0) return missing(name, reachLine(reach as Reach, currentKind(entries)));
 			return done(name, entry.declared === true ? "declared" : "");
 		}
 		case "review": {

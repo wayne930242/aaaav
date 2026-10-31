@@ -1,8 +1,9 @@
 """The phase machine over the loop book: sequences per kind, completion from evidence, regression, skip and back, the read phase, reflect."""
 
+import subprocess
 import unittest
 
-from tests.pi_harness import bash_result, stage, todo_create, tool_result
+from tests.pi_harness import bash_result, stage, todo_create, tool_call, tool_result
 from tests.test_pi_book import BookCase, answers, edit, subagent_result, text_of
 
 DIR = "docs/specs/2026-10-29-x"
@@ -260,6 +261,165 @@ class TestCloseAndReflect(PhaseCase):
         self.replay([*self.open_loop(anchor="pytest -q"), edit(), bash_result("pytest -q", 0, "ok"), stage(stage="friction", tried="a", found="b")])
         self.assertIn("skipped: reflect (resolved in the change)", self.line([stage(stage="skip", phase="reflect", reason="resolved in the change")]))
 
+
+
+class TestReclassify(PhaseCase):
+    def wide(self) -> list[dict]:
+        """Three source files in two modules, the reach that asks an unreviewed loop to re-classify."""
+        return [{"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"}, edit("src/a.py")]
+
+    def test_changing_the_kind_needs_a_reason(self):
+        out = self.replay([*self.open_loop("inline"), stage(stage="kind", kind="reviewed"), stage(stage="kind", kind="reviewed", reason="the reader moved to 9 callers")])
+        self.assertIn("needs `reason`", out["results"][2]["error"])
+        self.assertIn("kind changed: inline → reviewed (the reader moved to 9 callers)", text_of(out["results"][3]))
+        self.assertEqual(self.entries("kind")[-1]["reason"], "the reader moved to 9 callers")
+
+    def test_a_reason_lets_the_kind_drop(self):
+        out = self.replay([*self.open_loop("reviewed", anchor="pytest"), edit(), bash_result("pytest", 0, "ok"), subagent_result("reviewer", "r1", "Blocking: P0=0 P1=0"),
+                           stage(stage="kind", kind="inline", reason="one file after all")])
+        self.assertIn("kind changed: reviewed → inline (one file after all)", text_of(out["results"][-1]))
+
+    def test_an_anchor_run_past_the_reach_asks_an_inline_loop_to_reclassify_until_kind_answers(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok")])
+        notice = text_of(out["results"][-1]).splitlines()[-1]
+        self.assertTrue(notice.startswith("anchorloop: the change reaches 3 source files across 2 modules (lib, src);"), notice)
+        self.assertIn("`kind` with `reason`", notice)
+        self.assertIn("→ verify (missing: the change reaches 3 source files across 2 modules (lib, src)", self.line([]))
+        self.assertEqual(self.line([stage(stage="kind", kind="inline", reason="three one-line renames")]), "inline · phase verify ✓ → close")
+        self.assertEqual(self.entries("kind")[-1]["crossed"], ["files", "modules"])
+
+    def test_upgrading_answers_the_reach_and_a_reviewed_loop_is_never_asked(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop("reviewed", anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok")])
+        self.assertIsNone(out["results"][-1])
+        self.assertIn("phase verify ✓ → review", self.line([]))
+
+    def test_a_criterion_the_answer_did_not_cover_asks_again(self):
+        self.git_repo()
+        self.replay([*self.open_loop(anchor="pytest -q"), *self.wide(), bash_result("pytest -q", 0, "ok"), stage(stage="kind", kind="inline", reason="renames")])
+        out = self.replay([{"file": "README.md", "text": "a new flag\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertIn("and changes README.md", text_of(out["results"][-1]))
+        self.assertIn("→ verify (missing: the change reaches", self.line([]))
+
+    def test_a_quick_loop_is_asked_at_its_check(self):
+        self.git_repo()
+        self.replay([*self.open_loop("quick", anchor="make lint"), *self.wide(), bash_result("make lint", 0, "ok")])
+        self.assertIn("quick · phase act ✓ → check (missing: the change reaches 3 source files", self.line([]))
+
+    def test_a_declared_verify_measures_the_reach_too(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="the page shows the column"), *self.wide(), stage(stage="verify", note="the column is there")])
+        self.assertIn("anchorloop: the change reaches 3 source files", text_of(out["results"][-1]))
+        self.assertIn("→ verify (missing: the change reaches 3 source files", self.line([]))
+
+    def test_tests_lockfiles_specs_and_a_readme_without_source_do_not_count(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("src/a.py", "tests/test_a.py", "src/a.test.ts", "pkg/b_test.go", "uv.lock", f"{DIR}/spec.md")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.entries("verify")[-1]["reach"], {"source": ["src/a.py"], "modules": ["src"], "behavior": [], "crossed": []})
+        self.assertEqual(self.line([]), "inline · phase verify ✓ → close")
+        (self.cwd / "src/a.py").unlink()
+        self.replay([{"file": "README.md", "text": "x\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.entries("verify")[-1]["reach"]["crossed"], [])
+
+
+class TestReachEdges(PhaseCase):
+    """Review round 1 (R-F001..R-F007): what the reach counts and how its line reads."""
+
+    def reach(self) -> dict:
+        return self.entries("verify")[-1]["reach"]
+
+    def test_files_dirty_before_the_loop_count_only_once_the_loop_changes_them(self):
+        self.git_repo()
+        (self.cwd / "app.py").write_text("print(2)\n")
+        for name in ("notes", ".cache/conf", "lib/old.py"):
+            (self.cwd / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.cwd / name).write_text("before\n")
+        self.replay([*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["src/a.py"])
+        self.replay([{"file": "lib/old.py", "text": "changed in the loop\n"}, bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["lib/old.py", "src/a.py"])
+
+    def test_a_path_git_cannot_hash_hides_no_other_pre_dirty_file(self):
+        self.git_repo()
+        (self.cwd / "lib").mkdir()
+        (self.cwd / "lib/old.py").write_text("before\n")
+        (self.cwd / "lib/keep.py").write_text("before\n")
+        subprocess.run(["git", "-C", str(self.cwd), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.cwd), "commit", "-qm", "lib"], check=True, capture_output=True)
+        (self.cwd / "lib/old.py").write_text("dirty before the loop\n")
+        (self.cwd / "lib/keep.py").write_text("dirty before the loop, never touched\n")
+        (self.cwd / "app.py").unlink()
+        (self.cwd / "app.py").mkdir()
+        (self.cwd / "app.py/inner.txt").write_text("x\n")
+        self.replay([*self.open_loop(anchor="pytest -q"), {"file": "lib/old.py", "text": "changed in the loop\n"}, bash_result("pytest -q", 0, "ok")])
+        # Each other path still hashes alone, and the one git cannot hash counts, since its hash proves nothing.
+        self.assertEqual(self.reach()["source"], ["app.py", "lib/old.py"])
+
+    def test_a_repo_first_reached_by_a_merge_counts_the_merged_files_but_not_its_older_work(self):
+        other = self.cwd / "merged"
+        other.mkdir()
+        git = lambda *args: subprocess.run(["git", "-C", str(other), *args], check=True, capture_output=True)
+        for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@example.com"], ["config", "user.name", "t"]):
+            git(*args)
+        (other / "base.txt").write_text("b\n")
+        git("add", ".")
+        git("commit", "-qm", "base")
+        git("switch", "-qc", "feature")
+        for name in ("src/a.py", "src/b.py", "lib/c.py"):
+            (other / name).parent.mkdir(parents=True, exist_ok=True)
+            (other / name).write_text("x\n")
+        git("add", ".")
+        git("commit", "-qm", "feature")
+        git("switch", "-q", "main")
+        (other / "wip").mkdir()
+        (other / "wip/x.py").write_text("older work\n")
+        git("merge", "-q", "--no-ff", "-m", "merge feature", "feature")
+        self.replay([*self.open_loop(anchor="pytest -q"), bash_result(f"git -C {other} merge feature", 0, "Merge made"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach()["source"], ["lib/c.py", "src/a.py", "src/b.py"])
+
+    def test_a_second_repo_keeps_each_repos_directories_as_modules(self):
+        self.git_repo()
+        other = self.cwd / "vendor-repo"
+        other.mkdir()
+        for args in (["init", "-q"], ["config", "user.email", "t@example.com"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(other), *args], check=True, capture_output=True)
+        (other / "x.txt").write_text("x\n")
+        subprocess.run(["git", "-C", str(other), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(other), "commit", "-qm", "base"], check=True, capture_output=True)
+        (self.cwd / ".gitignore").write_text("vendor-repo/\n")
+        steps = [*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, {"file": "lib/b.py", "text": "b\n"}, edit("src/a.py"),
+                 tool_call("edit", str(other / "x.txt")), {"file": "vendor-repo/x.txt", "text": "y\n"}, edit(str(other / "x.txt")), bash_result("pytest -q", 0, "ok")]
+        self.replay(steps)
+        self.assertEqual(len(self.entries("base")), 2)
+        self.assertEqual(self.reach()["crossed"], ["modules"])
+        self.assertEqual(len(self.reach()["modules"]), 2)
+
+    def test_scratch_and_spec_readmes_and_source_named_readme_are_not_behavior_files(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("src/readme_render.py", "scratch/README.md", f"{DIR}/README.md")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("src/readme_render.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual((self.reach()["source"], self.reach()["behavior"]), (["src/readme_render.py"], []))
+
+    def test_root_files_count_as_files_but_not_as_a_module_and_more_lockfiles_and_fixtures_are_skipped(self):
+        self.git_repo()
+        files = [{"file": f, "text": "x\n"} for f in ("package.json", "pi/book.ts", "flake.lock", "tests/fixtures/a.json", "testdata/b.json", "conftest.py")]
+        self.replay([*self.open_loop(anchor="pytest -q"), *files, edit("pi/book.ts"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(self.reach(), {"source": ["package.json", "pi/book.ts"], "modules": ["pi"], "behavior": [], "crossed": []})
+
+    def test_the_line_keeps_the_bash_structured_content(self):
+        self.git_repo()
+        out = self.replay([*self.open_loop(anchor="pytest -q"), {"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"},
+                           edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertEqual(out["results"][-1].get("structuredContent"), {"exit_code": 0, "output": "ok"})
+
+    def test_an_undeclared_loop_is_told_to_declare_its_kind(self):
+        self.git_repo()
+        stated = {"event": "message_end", "payload": {"message": {"role": "assistant", "content": [{"type": "text", "text": "Reality anchor: pytest -q"}]}}}
+        out = self.replay([todo_create(), stated, tool_call("write", "src/a.py"), {"file": "src/a.py", "text": "a\n"}, {"file": "src/b.py", "text": "b\n"}, {"file": "lib/c.py", "text": "c\n"},
+                           edit("src/a.py"), bash_result("pytest -q", 0, "ok")])
+        self.assertIn("declare `kind` with `intent` and `reason`", text_of(out["results"][-1]))
 
 if __name__ == "__main__":
     unittest.main()

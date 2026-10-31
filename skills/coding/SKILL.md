@@ -9,14 +9,17 @@ Run the loop in [../anchorloop/SKILL.md](../anchorloop/SKILL.md) with one of the
 
 ## Classify
 
-Before the first production edit, declare the change **Inline** or **Durable**:
+Before the first production edit, classify the change by what it reaches, not by how settled the approach feels:
 
-- **Inline:** requirements and approach are clear, impact is bounded, and implementation and verification fit this run; a lasting behavior or public contract can still be Inline when the change is simple. The `intent` on the `kind` call states the observable behavior after the change; the user's source-change request approves it, and approval already given is not asked again.
-- **Durable:** the work needs a persistent design record because of material ambiguity, consequential trade-offs, cross-component coordination, migration risk, or a user-requested spec. Read [MINI-SDD.md](MINI-SDD.md) and create or resume its folder, which keeps no `tasks.md`; Spec waits for the user's approval before any production edit.
+- **Inline:** the change stays inside the files it edits: no export another file uses, no behavior its users are told about, and no behavior the requirement leaves open. The `intent` on the `kind` call states the observable behavior after the change; the user's source-change request approves it, and approval already given is not asked again.
+- **Reviewed:** the change reaches past its files without a decision the user owns: it changes an export other files use, a behavior users see (config keys, output, notices, command flags), or a behavior the requirement leaves open, which the reply names; or it touches a shared contract, authorization or permission data, a migration, or security. Before the first edit, write its premises in the todo's `metadata.premises`: three to five lines on what the change assumes holds, such as where its results land, what names may contain, and how paths are spelled. It needs no spec and no further approval.
+- **Durable:** the work needs a persistent design record because of material ambiguity, a trade-off the user owns, cross-component coordination, migration risk, or a user-requested spec. Read [MINI-SDD.md](MINI-SDD.md) and create or resume its folder, which keeps no `tasks.md`; Spec waits for the user's approval before any production edit.
+
+Re-classify when the reach changes: the user adds scope, an anchor run reports the diff's reach, or the change turns out smaller. Call `kind` with a `reason` naming the kind that now fits, or why the current one still fits. Verified work carries over; an upgrade adds only the new kind's phases, the premises and review for Reviewed, and for Durable the record from decide on, with the code so far as prototype evidence.
 
 ## Anchor
 
-Point the anchor at what the change touches: a one-line edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests. For Inline work, a green anchor plus a read of your own diff completes Verify; report the contract with its observed output in one line. Durable work verifies into `verification.md` as MINI-SDD describes.
+Point the anchor at what the change touches: a one-line edit anchors on the tests that assert that file; a shared code path anchors on its callers' tests and the repository's tree-wide checks, such as lint, config sweeps, ratchets, and changelog checks. For Inline work, a green anchor plus a read of your own diff completes Verify; report the contract with its observed output in one line. Reviewed work adds an independent review whose brief carries the premises and asks the reviewer to test each premise against the code, to sweep each finding's class across the change, and to confirm the tree-wide checks ran. Durable work verifies into `verification.md` as MINI-SDD describes.
 
 ## Playbooks
 

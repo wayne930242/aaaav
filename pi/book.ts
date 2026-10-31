@@ -13,6 +13,7 @@ import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
 	type Book,
+	type Entry,
 	KINDS,
 	allFriction,
 	anchorCommand,
@@ -50,7 +51,7 @@ import {
 	verifyAfterLastAct,
 } from "./support/book.ts";
 import { classify } from "./support/jev.ts";
-import { SEQUENCES, computePhases, describe, incompleteBefore, outsideWork } from "./support/phases.ts";
+import { REVIEWLESS, SEQUENCES, computePhases, describe, incompleteBefore, outsideWork, reachLine, reachOf, unansweredReach } from "./support/phases.ts";
 import { type Snapshot, snapshot } from "./support/snapshot.ts";
 import { isSubagent } from "./support/subagent.ts";
 
@@ -434,7 +435,8 @@ export default function (pi: ExtensionAPI) {
 		label: "Loop stage",
 		description:
 			"Declare only what the extension cannot observe in the anchorloop loop book. " +
-			"`kind` (kind, intent, optional anchor command; call again to upgrade the kind or set the anchor): quick (act, check), inline (anchor, act, verify), reviewed (adds review), durable (adds decide, grill, spec, read, approve, design); every kind ends with reflect, close. " +
+			"`kind` (kind, intent, optional anchor command; call again to set the anchor, or with `reason` to change the kind or answer a re-classification): quick (act, check), inline (anchor, act, verify), reviewed (adds review), durable (adds decide, grill, spec, read, approve, design); every kind ends with reflect, close. " +
+			"When an anchor run or declared verify of a quick or inline loop finds the change reaching 3 source files, 2 modules, or a README, changelog, or *.schema.json beside code, its verify waits for a `kind` call with `reason`. " +
 			"`verify` (note; only for an anchor that is not a command), `fresh-read` (a fresh-context read of the spec is done), `friction` (tried, found, led_by), `reflect` (friction ids, class misdirection|gap|resolved, action), " +
 			"`skip` / `back` (phase, reason), `close` (verdict), `read` (view the book). Edits, anchor runs, reviews, and spec files are read from evidence. " +
 			"A loop opens with the first `todo` create; `close` refuses while a pending or in-progress todo lacks metadata.followup.",
@@ -442,7 +444,7 @@ export default function (pi: ExtensionAPI) {
 			type: "object",
 			properties: {
 				stage: { type: "string", enum: [...STAGES] },
-				kind: { type: "string", enum: [...KINDS], description: "stage kind: the loop kind; a second call upgrades it" },
+				kind: { type: "string", enum: [...KINDS], description: "stage kind: the loop kind; a later call with `reason` changes it" },
 				intent: { type: "string", description: "stage kind: one line on what the loop delivers" },
 				anchor: { type: "string", description: "stage kind: the check command whose exit code observes the result" },
 				note: { type: "string", description: "stage verify: what was observed; stage fresh-read: who read the spec" },
@@ -454,7 +456,7 @@ export default function (pi: ExtensionAPI) {
 				class: { type: "string", enum: ["misdirection", "gap", "resolved"], description: "stage reflect" },
 				action: { type: "string", description: "stage reflect: what was done, such as solid-loop, memory, or a commit" },
 				phase: { type: "string", description: "stage skip or back: the phase" },
-				reason: { type: "string", description: "stage skip or back: why" },
+				reason: { type: "string", description: "stage skip or back: why; stage kind: why the kind changes, or why it still fits the measured reach" },
 				verdict: { type: "string", enum: ["landed", "blocked", "abandoned"], description: "stage close" },
 				view: { type: "string", enum: ["summary", "all"], description: "stage read; default summary" },
 			},
@@ -486,26 +488,33 @@ export default function (pi: ExtensionAPI) {
 				return { content: [{ type: "text" as const, text: closed.text }], details: closed.snapshot ? { snapshot: closed.snapshot } : undefined };
 			}
 			if (stage === "kind") {
-				if (!params.kind && !params.intent && !params.anchor) throw new Error("kind needs `kind`, `intent`, or `anchor`");
+				if (!params.kind && !params.intent && !params.anchor && !params.reason) throw new Error("kind needs `kind`, `intent`, `anchor`, or `reason`");
 				if (!had && (!params.kind || !params.intent)) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
+				const changed = had !== undefined && params.kind !== undefined && had !== params.kind;
+				if (changed && !params.reason) throw new Error(`changing the kind from ${had} to ${params.kind} needs \`reason\`: the reach grew, the user added scope, a user-owned decision appeared, or the change turned out smaller`);
+				touchRepo(book, join(ctx.cwd, "_"));
 				const notes: string[] = [];
-				if (params.kind || params.intent) {
-					appendEntry(book.path, "kind", { kind: params.kind ?? had, ...(params.intent ? { intent: params.intent } : {}) });
-					notes.push(had && params.kind && had !== params.kind ? `kind changed: ${had} → ${params.kind}` : `kind: ${params.kind ?? had}`);
+				if (params.kind || params.intent || params.reason) {
+					// A reason answers the reach measured now, so a later threshold asks again.
+					const answer = params.reason ? { reason: params.reason, crossed: reachOf(book.entries, ctx.cwd).crossed } : {};
+					appendEntry(book.path, "kind", { kind: params.kind ?? had, ...(params.intent ? { intent: params.intent } : {}), ...answer });
+					const why = params.reason ? ` (${params.reason})` : "";
+					notes.push(changed ? `kind changed: ${had} → ${params.kind}${why}` : `kind: ${params.kind ?? had}${why}`);
 				}
 				if (params.anchor) {
 					appendEntry(book.path, "anchor", { check: params.anchor });
 					notes.push(`anchor: ${params.anchor}`);
 				}
-				touchRepo(book, join(ctx.cwd, "_"));
 				return reply(notes.join("\n"));
 			}
 			if (stage === "verify") {
 				if (!params.note) throw new Error("verify needs a `note` saying what was observed");
 				const result = params.result ?? "pass";
 				const recorded = childId() !== undefined || had === "quick" ? "check" : "verify";
-				appendEntry(book.path, recorded, { declared: true, note: params.note, result, exit: result === "pass" ? 0 : 1 });
-				return reply(`${recorded} declared: ${result} — ${params.note}`);
+				const entry = appendEntry(book.path, recorded, { declared: true, note: params.note, result, exit: result === "pass" ? 0 : 1, ...reachField(book, ctx.cwd) });
+				book.entries.push(entry);
+				const notice = reachNotice(book, entry);
+				return reply(`${recorded} declared: ${result} — ${params.note}${notice ? `\n${notice}` : ""}`);
 			}
 			if (stage === "fresh-read") {
 				appendEntry(book.path, "goldfish", { source: "declared", ...(params.note ? { note: params.note } : {}) });
@@ -558,17 +567,34 @@ export default function (pi: ExtensionAPI) {
 		}),
 	);
 
-	/** Records what a finished bash call shows: runs of the loop anchor, of task anchors, and a first commit as the change. */
-	function recordBash(book: Book, event: { input: unknown; isError?: boolean; structuredContent?: unknown; content?: unknown }): void {
+	/** The reach of an unreviewed loop's diff, recorded on its verify or check entry; a reviewed loop is never measured. */
+	function reachField(book: Book, cwd: string): { reach?: ReturnType<typeof reachOf> } {
+		return REVIEWLESS.has(currentKind(book.entries) ?? "inline") ? { reach: reachOf(book.entries, cwd) } : {};
+	}
+
+	/** The line that asks the loop to re-classify after a verify or check entry whose reach no `kind` answer covers. */
+	function reachNotice(book: Book, entry: Entry): string | undefined {
+		const reach = entry.reach as ReturnType<typeof reachOf> | undefined;
+		return reach && unansweredReach(book.entries, reach).length > 0 ? `anchorloop: ${reachLine(reach, currentKind(book.entries))}.` : undefined;
+	}
+
+	/**
+	 * Records what a finished bash call shows: runs of the loop anchor, of task anchors, and a first commit as the change.
+	 * Returns the re-classification line when an anchor run of an unreviewed loop measured a reach no `kind` answer covers.
+	 */
+	function recordBash(book: Book, event: { input: unknown; isError?: boolean; structuredContent?: unknown; content?: unknown }, cwd: string): string | undefined {
 		const structured = event.structuredContent as { output?: unknown } | undefined;
 		const output = typeof structured?.output === "string" ? structured.output : textOf(event.content);
 		const command = String((event.input as { command?: unknown }).command ?? "");
 		const exit = bashExit(event);
 		const last = lastLine(output);
 		const anchor = anchorCommand(book.entries);
+		let notice: string | undefined;
 		if (anchor && anchorRun(command, anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
-			book.entries.push(appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last }));
+			const entry = appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last, ...reachField(book, cwd) });
+			book.entries.push(entry);
+			notice = reachNotice(book, entry);
 		}
 		for (const task of latestTasks(book.entries)) {
 			if (typeof task.anchor === "string" && anchorRun(command, task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
@@ -582,6 +608,7 @@ export default function (pi: ExtensionAPI) {
 			const cwd = String(book.header.cwd ?? "");
 			if (diffAgainstBases(book.entries).paths.some((path) => !outsideWork(path, cwd))) appendEntry(book.path, "edit", { via: "commit" });
 		}
+		return notice;
 	}
 
 	pi.on(
@@ -589,8 +616,9 @@ export default function (pi: ExtensionAPI) {
 		guarded((event, ctx) => {
 			if (event.toolName === "bash") {
 				const book = openLoop(ctx);
-				if (book) recordBash(book, event);
-				return;
+				const notice = book ? recordBash(book, event, ctx.cwd) : undefined;
+				// The line only appends text, so the bash call's structured output passes on unchanged.
+				return notice ? { content: [...((event.content as unknown[]) ?? []), { type: "text", text: notice }], structuredContent: event.structuredContent } : undefined;
 			}
 			if (event.isError) return;
 			if (event.toolName === "todo") {
