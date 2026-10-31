@@ -499,12 +499,6 @@ export function retryPairs(entries: Entry[]): RetryPair[] {
 	return pairs;
 }
 
-/** A retry pair that no friction entry follows. */
-export function retryWithoutFriction(entries: Entry[]): boolean {
-	const lastFriction = lastIndex(entries, "friction");
-	return retryPairs(entries).some((pair) => pair.pass > lastFriction);
-}
-
 // --- todos ---------------------------------------------------------------------------------------
 
 export type Task = { id: number; subject: string; status: string; metadata?: Record<string, unknown> };

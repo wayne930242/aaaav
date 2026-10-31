@@ -35,6 +35,7 @@ import {
 	openLoop,
 	replayTodos,
 	refsOf,
+	retryPairs,
 	resolveRef,
 	reviewTrend,
 	reviews,
@@ -96,6 +97,30 @@ function textOf(content: unknown): string {
 	if (typeof content === "string") return content;
 	if (!Array.isArray(content)) return "";
 	return (content as Block[]).map((block) => (block && typeof block.text === "string" ? block.text : "")).filter(Boolean).join("\n");
+}
+
+/** `text` cut to `limit` characters, the cut marked. */
+function clip(text: string, limit = 120): string {
+	return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
+}
+
+const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g;
+// Stack frames and traceback headers say where, not what; the key line says what failed.
+const FRAME = /^(?:at\s|File\s"|Traceback\b|\^+$)/;
+const KEY_LINES = [/^(?:FAILED|ERROR)\b/, /^E\s+\S/, /\b(?:error|fatal|panic|exception)\b/i, /\bfail(?:ed|ure|s)?\b/i];
+
+/** The one line of a failed run's output that says what failed, at most 120 characters; the last line when none does. */
+function keyLine(text: string): string {
+	const lines = text
+		.replace(ANSI, "")
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line && !FRAME.test(line));
+	for (const pattern of KEY_LINES) {
+		const hit = lines.find((line) => pattern.test(line));
+		if (hit) return clip(hit);
+	}
+	return clip(lines.at(-1) ?? "");
 }
 
 function lastLine(text: string): string {
@@ -297,6 +322,8 @@ function statedAnchor(message: { role?: string; content?: unknown } | undefined)
 	return found ? found[1].trim().slice(0, 300) || "(stated on the next line)" : undefined;
 }
 
+const STATUS_KEY = "anchorloop";
+
 const reply = (text: string) => ({ content: [{ type: "text" as const, text }], details: undefined });
 
 export default function (pi: ExtensionAPI) {
@@ -328,7 +355,6 @@ export default function (pi: ExtensionAPI) {
 			`reviews: ${reviewTrend(book.entries)}; open todos: ${open}; friction: ${friction.length} (${friction.filter((item) => !item.reflected).length} unreflected)`,
 			...childLines(book.entries).map((line) => `child ${line}`),
 			...friction.filter((item) => item.owner !== "main").map((item) => `friction ${item.ref}: ${item.tried} → ${item.found}${item.reflected ? ` [${item.class}]` : ""}`),
-			...phases.hints,
 			...freshReadLine(book, phases),
 		];
 	}
@@ -463,87 +489,95 @@ export default function (pi: ExtensionAPI) {
 			required: ["stage"],
 			additionalProperties: false,
 		},
-		async execute(_toolCallId: string, raw: unknown, _signal: unknown, _onUpdate: unknown, ctx: ExtensionContext) {
-			const params = raw as Params;
-			const { stage } = params;
-			if (!(STAGES as readonly string[]).includes(stage)) throw new Error(`unknown stage \`${String(stage)}\`; declare one of ${STAGES.join(", ")}`);
-			let book = openLoop(ctx);
-			if (!book && stage === "kind") {
-				// A todo create in the same batch may not have landed yet; whichever comes first opens the loop.
-				if (!params.kind || !params.intent) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
-				book = createBook(ctx);
-				recordPriorAnchor(book, ctx);
+		async execute(toolCallId: string, raw: unknown, signal: unknown, onUpdate: unknown, ctx: ExtensionContext) {
+			try {
+				return await stageTool(toolCallId, raw, signal, onUpdate, ctx);
+			} finally {
+				guarded(showStatus)(ctx);
 			}
-			if (!book) return reply("No loop is open, so nothing was recorded. A loop opens with the first `todo` create or `kind`.");
-			const had = currentKind(book.entries);
-			const sequence = SEQUENCES[had ?? "inline"];
-			if (stage === "read") {
-				const lines = [...summaryLines(book, ctx), ...taskLines(book.entries, todosOf(ctx), ctx.cwd)];
-				if (params.view === "all") lines.push("entries:", ...book.entries.map((entry) => JSON.stringify(entry).slice(0, 300)));
-				return reply(lines.join("\n"));
-			}
-			if (stage === "close") {
-				if (!params.verdict) throw new Error("close needs a verdict: landed, blocked, or abandoned");
-				const closed = close(book, ctx, params.verdict);
-				return { content: [{ type: "text" as const, text: closed.text }], details: closed.snapshot ? { snapshot: closed.snapshot } : undefined };
-			}
-			if (stage === "kind") {
-				if (!params.kind && !params.intent && !params.anchor && !params.reason) throw new Error("kind needs `kind`, `intent`, `anchor`, or `reason`");
-				if (!had && (!params.kind || !params.intent)) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
-				const changed = had !== undefined && params.kind !== undefined && had !== params.kind;
-				if (changed && !params.reason) throw new Error(`changing the kind from ${had} to ${params.kind} needs \`reason\`: the reach grew, the user added scope, a user-owned decision appeared, or the change turned out smaller`);
-				touchRepo(book, join(ctx.cwd, "_"));
-				const notes: string[] = [];
-				if (params.kind || params.intent || params.reason) {
-					// A reason answers the reach measured now, so a later threshold asks again.
-					const answer = params.reason ? { reason: params.reason, crossed: reachOf(book.entries, ctx.cwd).crossed } : {};
-					appendEntry(book.path, "kind", { kind: params.kind ?? had, ...(params.intent ? { intent: params.intent } : {}), ...answer });
-					const why = params.reason ? ` (${params.reason})` : "";
-					notes.push(changed ? `kind changed: ${had} → ${params.kind}${why}` : `kind: ${params.kind ?? had}${why}`);
-				}
-				if (params.anchor) {
-					appendEntry(book.path, "anchor", { check: params.anchor });
-					notes.push(`anchor: ${params.anchor}`);
-				}
-				return reply(notes.join("\n"));
-			}
-			if (stage === "verify") {
-				if (!params.note) throw new Error("verify needs a `note` saying what was observed");
-				const result = params.result ?? "pass";
-				const recorded = childId() !== undefined || had === "quick" ? "check" : "verify";
-				const entry = appendEntry(book.path, recorded, { declared: true, note: params.note, result, exit: result === "pass" ? 0 : 1, ...reachField(book, ctx.cwd) });
-				book.entries.push(entry);
-				const notice = reachNotice(book, entry);
-				return reply(`${recorded} declared: ${result} — ${params.note}${notice ? `\n${notice}` : ""}`);
-			}
-			if (stage === "fresh-read") {
-				appendEntry(book.path, "goldfish", { source: "declared", ...(params.note ? { note: params.note } : {}) });
-				return reply("fresh-read recorded.");
-			}
-			if (stage === "friction") {
-				if (!params.tried || !params.found) throw new Error("friction needs `tried` and `found`");
-				const id = frictionOf(book.entries).length + 1;
-				appendEntry(book.path, "friction", { id, tried: params.tried, found: params.found, led_by: params.led_by || "none" });
-				return reply(`friction #${id} recorded.`);
-			}
-			if (stage === "reflect") {
-				const known = allFriction(book.entries).map((item) => item.ref);
-				const ids = (params.friction ?? []).map(String);
-				if (ids.length === 0 || !params.class) throw new Error(`reflect needs \`friction\` ids (${known.join(", ") || "none recorded"}) and \`class\``);
-				const unknown = ids.filter((id) => !known.includes(id));
-				if (unknown.length) throw new Error(`unknown friction ${unknown.join(", ")}; known: ${known.join(", ") || "none"}`);
-				appendEntry(book.path, "reflect", { friction: ids, class: params.class, ...(params.action ? { action: params.action } : {}) });
-				return reply(`reflect recorded for ${ids.join(", ")} (${params.class}).`);
-			}
-			// skip and back
-			const phase = params.phase;
-			const known = sequence.filter((name) => name !== "close");
-			if (!phase || !known.includes(phase)) throw new Error(`${stage} needs \`phase\`, one of ${known.join(", ")} for a ${had ?? "undeclared"} loop`);
-			if (!params.reason) throw new Error(`${stage} needs a \`reason\``);
-			appendEntry(book.path, stage, { phase, reason: params.reason });
-			return reply(stage === "skip" ? `${phase}: skipped (${params.reason}).` : `back to ${phase} (${params.reason}); later phases count as incomplete until their conditions hold again.`);
 		},
 	});
+
+	async function stageTool(_toolCallId: string, raw: unknown, _signal: unknown, _onUpdate: unknown, ctx: ExtensionContext) {
+		const params = raw as Params;
+		const { stage } = params;
+		if (!(STAGES as readonly string[]).includes(stage)) throw new Error(`unknown stage \`${String(stage)}\`; declare one of ${STAGES.join(", ")}`);
+		let book = openLoop(ctx);
+		if (!book && stage === "kind") {
+			// A todo create in the same batch may not have landed yet; whichever comes first opens the loop.
+			if (!params.kind || !params.intent) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
+			book = createBook(ctx);
+			recordPriorAnchor(book, ctx);
+		}
+		if (!book) return reply("No loop is open, so nothing was recorded. A loop opens with the first `todo` create or `kind`.");
+		const had = currentKind(book.entries);
+		const sequence = SEQUENCES[had ?? "inline"];
+		if (stage === "read") {
+			const lines = [...summaryLines(book, ctx), ...taskLines(book.entries, todosOf(ctx), ctx.cwd)];
+			if (params.view === "all") lines.push("entries:", ...book.entries.map((entry) => JSON.stringify(entry).slice(0, 300)));
+			return reply(lines.join("\n"));
+		}
+		if (stage === "close") {
+			if (!params.verdict) throw new Error("close needs a verdict: landed, blocked, or abandoned");
+			const closed = close(book, ctx, params.verdict);
+			return { content: [{ type: "text" as const, text: closed.text }], details: closed.snapshot ? { snapshot: closed.snapshot } : undefined };
+		}
+		if (stage === "kind") {
+			if (!params.kind && !params.intent && !params.anchor && !params.reason) throw new Error("kind needs `kind`, `intent`, `anchor`, or `reason`");
+			if (!had && (!params.kind || !params.intent)) throw new Error("the first kind declaration needs `kind` and a one-line `intent`");
+			const changed = had !== undefined && params.kind !== undefined && had !== params.kind;
+			if (changed && !params.reason) throw new Error(`changing the kind from ${had} to ${params.kind} needs \`reason\`: the reach grew, the user added scope, a user-owned decision appeared, or the change turned out smaller`);
+			touchRepo(book, join(ctx.cwd, "_"));
+			const notes: string[] = [];
+			if (params.kind || params.intent || params.reason) {
+				// A reason answers the reach measured now, so a later threshold asks again.
+				const answer = params.reason ? { reason: params.reason, crossed: reachOf(book.entries, ctx.cwd).crossed } : {};
+				appendEntry(book.path, "kind", { kind: params.kind ?? had, ...(params.intent ? { intent: params.intent } : {}), ...answer });
+				const why = params.reason ? ` (${params.reason})` : "";
+				notes.push(changed ? `kind changed: ${had} → ${params.kind}${why}` : `kind: ${params.kind ?? had}${why}`);
+			}
+			if (params.anchor) {
+				appendEntry(book.path, "anchor", { check: params.anchor });
+				notes.push(`anchor: ${params.anchor}`);
+			}
+			return reply(notes.join("\n"));
+		}
+		if (stage === "verify") {
+			if (!params.note) throw new Error("verify needs a `note` saying what was observed");
+			const result = params.result ?? "pass";
+			const recorded = childId() !== undefined || had === "quick" ? "check" : "verify";
+			const entry = appendEntry(book.path, recorded, { declared: true, note: params.note, result, exit: result === "pass" ? 0 : 1, ...reachField(book, ctx.cwd) });
+			book.entries.push(entry);
+			const notice = reachNotice(book, entry);
+			return reply(`${recorded} declared: ${result} — ${params.note}${notice ? `\n${notice}` : ""}`);
+		}
+		if (stage === "fresh-read") {
+			appendEntry(book.path, "goldfish", { source: "declared", ...(params.note ? { note: params.note } : {}) });
+			return reply("fresh-read recorded.");
+		}
+		if (stage === "friction") {
+			if (!params.tried || !params.found) throw new Error("friction needs `tried` and `found`");
+			const id = frictionOf(book.entries).length + 1;
+			appendEntry(book.path, "friction", { id, tried: params.tried, found: params.found, led_by: params.led_by || "none" });
+			return reply(`friction #${id} recorded.`);
+		}
+		if (stage === "reflect") {
+			const known = allFriction(book.entries).map((item) => item.ref);
+			const ids = (params.friction ?? []).map(String);
+			if (ids.length === 0 || !params.class) throw new Error(`reflect needs \`friction\` ids (${known.join(", ") || "none recorded"}) and \`class\``);
+			const unknown = ids.filter((id) => !known.includes(id));
+			if (unknown.length) throw new Error(`unknown friction ${unknown.join(", ")}; known: ${known.join(", ") || "none"}`);
+			appendEntry(book.path, "reflect", { friction: ids, class: params.class, ...(params.action ? { action: params.action } : {}) });
+			return reply(`reflect recorded for ${ids.join(", ")} (${params.class}).`);
+		}
+		// skip and back
+		const phase = params.phase;
+		const known = sequence.filter((name) => name !== "close");
+		if (!phase || !known.includes(phase)) throw new Error(`${stage} needs \`phase\`, one of ${known.join(", ")} for a ${had ?? "undeclared"} loop`);
+		if (!params.reason) throw new Error(`${stage} needs a \`reason\``);
+		appendEntry(book.path, stage, { phase, reason: params.reason });
+		return reply(stage === "skip" ? `${phase}: skipped (${params.reason}).` : `back to ${phase} (${params.reason}); later phases count as incomplete until their conditions hold again.`);
+	}
 
 	pi.on(
 		"session_start",
@@ -554,6 +588,7 @@ export default function (pi: ExtensionAPI) {
 				...swept.open.map((path) => `open loop book: ${path}`),
 			];
 			if (lines.length > 0) ctx.ui.notify(`anchorloop books\n${lines.join("\n")}`, "info");
+			showStatus(ctx);
 		}),
 	);
 
@@ -589,16 +624,23 @@ export default function (pi: ExtensionAPI) {
 		const exit = bashExit(event);
 		const last = lastLine(output);
 		const anchor = anchorCommand(book.entries);
-		let notice: string | undefined;
+		const notices: string[] = [];
+		// A failed run keeps its key line, so a rerun that passes can name what failed without the whole output.
+		const keyOf = (code: unknown) => (typeof code === "number" && code !== 0 ? { key: keyLine(output) } : {});
 		if (anchor && anchorRun(command, anchor)) {
 			const recorded = childId() !== undefined || currentKind(book.entries) === "quick" ? "check" : "verify";
-			const entry = appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: anchorExit(command, anchor, exit), last, ...reachField(book, cwd) });
+			const code = anchorExit(command, anchor, exit);
+			const entry = appendEntry(book.path, recorded, { command: anchor.slice(0, 200), exit: code, last, ...keyOf(code), ...reachField(book, cwd) });
 			book.entries.push(entry);
-			notice = reachNotice(book, entry);
+			const reach = reachNotice(book, entry);
+			if (reach) notices.push(reach);
 		}
 		for (const task of latestTasks(book.entries)) {
-			if (typeof task.anchor === "string" && anchorRun(command, task.anchor)) appendEntry(book.path, "taskrun", { id: task.id, exit: anchorExit(command, task.anchor, exit), last });
+			if (typeof task.anchor !== "string" || !anchorRun(command, task.anchor)) continue;
+			const code = anchorExit(command, task.anchor, exit);
+			book.entries.push(appendEntry(book.path, "taskrun", { id: task.id, command: task.anchor.slice(0, 200), exit: code, last, ...keyOf(code) }));
 		}
+		notices.push(...autoFriction(book));
 		const merged = mergeRun(command);
 		if (exit === 0 && merged && !/Already up[ -]to[ -]date/i.test(last ?? "") && book.entries.at(-1)?.stage !== "edit") {
 			touchRepoBeforeMerge(book, resolve(String(book.header.cwd ?? process.cwd()), merged.dir), merged.verb);
@@ -608,7 +650,40 @@ export default function (pi: ExtensionAPI) {
 			const cwd = String(book.header.cwd ?? "");
 			if (diffAgainstBases(book.entries).paths.some((path) => !outsideWork(path, cwd))) appendEntry(book.path, "edit", { via: "commit" });
 		}
-		return notice;
+		return notices.join("\n") || undefined;
+	}
+
+	/**
+	 * Records one friction line for each anchor that passed again after it had passed and then failed, unless a friction
+	 * entry already follows the failure. Returns the lines that tell the agent.
+	 */
+	function autoFriction(book: Book): string[] {
+		const lines: string[] = [];
+		for (const pair of retryPairs(book.entries)) {
+			if (book.entries.some((entry, index) => index > pair.fail && entry.stage === "friction")) continue;
+			const failed = book.entries[pair.fail];
+			const tried = clip(`rerun of ${String(failed.command ?? pair.key)}`, 80);
+			const found = clip(String(failed.key ?? failed.last ?? "") || "failed with no output");
+			const id = frictionOf(book.entries).length + 1;
+			book.entries.push(appendEntry(book.path, "friction", { id, tried, found, led_by: "none", auto: true }));
+			lines.push(`anchorloop: friction #${id} recorded from the ${tried}: ${found}. Classify it with \`reflect\` before close.`);
+		}
+		return lines;
+	}
+
+	/** The footer line: the loop's kind, its last complete phase, the next one, and the friction still to reflect. */
+	function showStatus(ctx: ExtensionContext): void {
+		if (typeof ctx.ui?.setStatus !== "function") return;
+		const book = openLoop(ctx);
+		if (!book) {
+			ctx.ui.setStatus(STATUS_KEY, undefined);
+			return;
+		}
+		const phases = phasesOf(book, ctx);
+		const open = allFriction(book.entries).filter((item) => !item.reflected).length;
+		const kind = phases.kind === "undeclared" ? "no kind" : phases.kind;
+		const at = `${phases.current}${phases.current === "start" ? "" : " ✓"} → ${phases.next}`;
+		ctx.ui.setStatus(STATUS_KEY, `anchorloop ${kind} · ${at}${open ? ` · ${open} friction to reflect` : ""}`);
 	}
 
 	pi.on(
@@ -658,6 +733,14 @@ export default function (pi: ExtensionAPI) {
 			}
 			const summary = summarizeArtifact(book.entries, path, text);
 			if (summary) appendEntry(book.path, summary.stage, summary.fields);
+		}),
+	);
+
+	// Registered after the recording handler, so the footer reads what that tool call just recorded.
+	pi.on(
+		"tool_result",
+		guarded((_event, ctx) => {
+			showStatus(ctx);
 		}),
 	);
 
